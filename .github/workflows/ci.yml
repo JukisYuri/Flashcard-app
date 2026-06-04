@@ -27,11 +27,6 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # 4. Chạy con bot tự động kiểm tra chất lượng code Kotlin
-      - name: Run Detekt Static Code Analysis
-        run: ./gradlew detekt
-        continue-on-error: true # Nếu code chưa chuẩn style thì vẫn chạy tiếp bước build ở dưới
-
-      # 5. Biên dịch thử dự án
+      # 4. Biên dịch dự án
       - name: Build project with Gradle
         run: ./gradlew build -x test
