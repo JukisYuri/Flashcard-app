@@ -27,6 +27,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # 4. Biên dịch dự án
+      - name: Run Tests
+        run: ./gradlew test
+
       - name: Build project with Gradle
         run: ./gradlew build -x test
