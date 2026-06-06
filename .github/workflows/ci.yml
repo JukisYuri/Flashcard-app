@@ -1,4 +1,4 @@
-name: MizuBot
+name: Mizu
 
 on:
   push:
@@ -13,15 +13,15 @@ permissions:
 jobs:
   # Tự động comment khi có PR mới
   welcome-pr:
-    name: Yuri Bot Greet PR
-    if: github.event_name == 'pull_request'
+    name: Mizu Greet Your PR :>
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
     runs-on: ubuntu-latest
     steps:
       - name: Gửi lời chào từ Bot
         uses: actions/github-script@v7
         with:
           script: |
-            const msg = `👋 Chào đằng ấy! **MizuBot** đã nhận được Pull Request rồi nha.\n\nCứ cắm tai nghe bật nhạc chill đi, mình đang lôi code ra "soi" rồi. Chờ mình lấy dấu tick xanh về cho nhé! (⌐■_■)✨`;
+            const msg = `👋 Chào đằng ấy! **Mizu (Bot)** đã nhận được Pull Request rồi nha.\n\nCứ cắm tai nghe bật nhạc chill đi, mình đang lôi code ra "soi" rồi. Chờ mình lấy dấu tick xanh về cho nhé! (⌐■_■)✨`;
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
