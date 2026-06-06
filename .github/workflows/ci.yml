@@ -7,7 +7,21 @@ on:
     branches: [ "master" ]
 
 jobs:
+  # Kiểm tra chuẩn Commit Message
+  lint-commits:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Commit Message Convention
+        uses: wagoid/commitlint-github-action@v5
+
+  # Biên dịch và Test
   build-and-check:
+    needs: lint-commits
     runs-on: ubuntu-latest
 
     steps:
