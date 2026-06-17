@@ -11,25 +11,6 @@ permissions:
   contents: read
 
 jobs:
-  # Tự động comment khi có PR mới
-  welcome-pr:
-    name: Mizu Greet Your PR :>
-    if: github.event_name == 'pull_request' && github.event.action == 'opened'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Gửi lời chào từ Bot
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const msg = `👋 Chào đằng ấy! **Mizu (Bot)** đã nhận được Pull Request rồi nha.\n\nCứ cắm tai nghe bật nhạc chill đi, mình đang lôi code ra "soi" rồi. Chờ mình lấy dấu tick xanh về cho nhé! (⌐■_■)✨`;
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: msg
-            })
-
   # Kiểm tra chuẩn Commit Message
   lint-commits:
     runs-on: ubuntu-latest
@@ -61,8 +42,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Run Tests
-        run: ./gradlew test
+      - name: Build and Test
+        run: ./gradlew build
 
-      - name: Build project with Gradle
-        run: ./gradlew build -x test
+        # Lưu lại báo cáo test nếu bị lỗi để dễ dàng bắt bug
+      - name: Upload Test Report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mizu-test-reports
+          path: build/reports/tests/
+          retention-days: 5
