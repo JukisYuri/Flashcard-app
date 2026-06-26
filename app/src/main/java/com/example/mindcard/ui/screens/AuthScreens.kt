@@ -34,6 +34,13 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.drawscope.scale
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.GoogleAuthProvider
 
 // Color palette definitions matching DESIGN.md
 val PrimaryIndigo = Color(0xFF4648D4)
@@ -138,6 +145,34 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)!!
+                val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+                isLoading = true
+                auth.signInWithCredential(credential)
+                    .addOnCompleteListener { authTask ->
+                        isLoading = false
+                        if (authTask.isSuccessful) {
+                            onNavigate(Main)
+                        } else {
+                            errorMessage = authTask.exception?.localizedMessage ?: "Firebase Sign In with Google failed."
+                        }
+                    }
+            } catch (e: ApiException) {
+                isLoading = false
+                errorMessage = "Google Sign In failed: ${e.localizedMessage}"
+            }
+        } else {
+            isLoading = false
+        }
+    }
 
     Box(
         modifier = modifier
@@ -359,8 +394,17 @@ fun LoginScreen(
             // Google Login Button
             OutlinedButton(
                 onClick = {
-                    // Google Sign In (mock navigation since real integration requires Play Services flow)
-                    onNavigate(Main)
+                    isLoading = true
+                    errorMessage = null
+                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                        .requestIdToken("705846448248-smuta58jre9j37as30g510flrai5g41h.apps.googleusercontent.com")
+                        .requestEmail()
+                        .build()
+                    val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                    googleSignInClient.signOut().addOnCompleteListener {
+                        val signInIntent = googleSignInClient.signInIntent
+                        launcher.launch(signInIntent)
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
