@@ -26,6 +26,12 @@ import com.example.mindcard.ForgotPassword
 import com.example.mindcard.Login
 import com.example.mindcard.Main
 import com.example.mindcard.Register
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.graphics.drawscope.scale
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 
@@ -64,12 +70,12 @@ fun SquishyButton(
             .then(clickableModifier)
             .background(
                 if (enabled && !isLoading) containerColor else containerColor.copy(alpha = 0.6f),
-                RoundedCornerShape(16.dp)
+                CircleShape
             )
             .border(
                 width = 2.dp,
                 color = if (enabled && !isLoading) shadowColor else shadowColor.copy(alpha = 0.6f),
-                shape = RoundedCornerShape(16.dp)
+                shape = CircleShape
             )
             .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center
@@ -104,6 +110,25 @@ fun SquishyButton(
 }
 
 @Composable
+fun GoogleIcon(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(20.dp)) {
+        val scale = size.width / 24f
+        
+        val bluePath = PathParser().parsePathString("M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z").toPath()
+        val greenPath = PathParser().parsePathString("M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z").toPath()
+        val yellowPath = PathParser().parsePathString("M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z").toPath()
+        val redPath = PathParser().parsePathString("M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z").toPath()
+        
+        scale(scale, scale, pivot = androidx.compose.ui.geometry.Offset.Zero) {
+            drawPath(bluePath, Color(0xFF4285F4))
+            drawPath(greenPath, Color(0xFF34A853))
+            drawPath(yellowPath, Color(0xFFFBBC05))
+            drawPath(redPath, Color(0xFFEA4335))
+        }
+    }
+}
+
+@Composable
 fun LoginScreen(
     onNavigate: (NavKey) -> Unit,
     modifier: Modifier = Modifier
@@ -120,8 +145,8 @@ fun LoginScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFFE1E0FF),
-                        BackgroundFrost
+                        Color(0xFFE8E7FF), // Light purple/indigo
+                        Color(0xFFE8F8EC)  // Light green/teal
                     )
                 )
             )
@@ -131,28 +156,37 @@ fun LoginScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White.copy(alpha = 0.9f), RoundedCornerShape(24.dp))
-                .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                .shadow(
+                    elevation = 16.dp,
+                    shape = RoundedCornerShape(32.dp),
+                    clip = false
+                )
+                .background(Color.White.copy(alpha = 0.95f), RoundedCornerShape(32.dp))
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Logo Icon
+            // Circular Logo Icon
             Box(
                 modifier = Modifier
-                    .size(64.dp)
-                    .background(PrimaryIndigo, RoundedCornerShape(16.dp))
-                    .border(2.dp, DarkIndigo, RoundedCornerShape(16.dp)),
+                    .size(72.dp)
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(PrimaryIndigo, DarkIndigo)
+                        ),
+                        CircleShape
+                    )
+                    .shadow(4.dp, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text("🚀", fontSize = 32.sp)
+                Text("🚀", fontSize = 36.sp)
             }
 
             Text(
                 text = "Mind Card",
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
-                color = PrimaryIndigo
+                color = Color(0xFF1E2022)
             )
 
             Text(
@@ -172,45 +206,108 @@ fun LoginScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // Email Field
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Email Address") },
-                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
-                shape = RoundedCornerShape(16.dp),
+            // Email Field Group
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("learner@mindcard.com") },
-                enabled = !isLoading,
-                singleLine = true
-            )
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Email Address",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E2022),
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Email,
+                            contentDescription = null,
+                            tint = OutlineColor
+                        )
+                    },
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = {
+                        Text(
+                            text = "learner@mindcard.com",
+                            color = OutlineColor.copy(alpha = 0.5f)
+                        )
+                    },
+                    enabled = !isLoading,
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFFEFF1F8),
+                        unfocusedContainerColor = Color(0xFFEFF1F8),
+                        disabledContainerColor = Color(0xFFEFF1F8).copy(alpha = 0.6f),
+                        focusedBorderColor = PrimaryIndigo,
+                        unfocusedBorderColor = Color.Transparent,
+                        disabledBorderColor = Color.Transparent
+                    )
+                )
+            }
 
-            // Password Field
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                shape = RoundedCornerShape(16.dp),
-                visualTransformation = PasswordVisualTransformation(),
+            // Password Field Group
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("••••••••") },
-                enabled = !isLoading,
-                singleLine = true
-            )
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Password",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E2022),
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = OutlineColor
+                        )
+                    },
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = {
+                        Text(
+                            text = "••••••••",
+                            color = OutlineColor.copy(alpha = 0.5f)
+                        )
+                    },
+                    visualTransformation = PasswordVisualTransformation(),
+                    enabled = !isLoading,
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFFEFF1F8),
+                        unfocusedContainerColor = Color(0xFFEFF1F8),
+                        disabledContainerColor = Color(0xFFEFF1F8).copy(alpha = 0.6f),
+                        focusedBorderColor = PrimaryIndigo,
+                        unfocusedBorderColor = Color.Transparent,
+                        disabledBorderColor = Color.Transparent
+                    )
+                )
+            }
 
-            Text(
-                text = "Forgot Password?",
-                color = if (isLoading) OutlineColor else PrimaryIndigo,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .align(Alignment.End)
-                    .clickable(enabled = !isLoading) { onNavigate(ForgotPassword) }
-            )
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Forgot Password?",
+                    color = if (isLoading) OutlineColor else PrimaryIndigo,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .clickable(enabled = !isLoading) { onNavigate(ForgotPassword) }
+                )
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             SquishyButton(
                 onClick = {
@@ -235,14 +332,83 @@ fun LoginScreen(
                 isLoading = isLoading
             )
 
-            Text(
-                text = "New to Mind Card? Sign up here",
+            // OR Divider
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = OutlineVariantColor.copy(alpha = 0.6f),
+                    thickness = 1.dp
+                )
+                Text(
+                    text = "OR",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = OutlineColor.copy(alpha = 0.8f)
+                )
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = OutlineVariantColor.copy(alpha = 0.6f),
+                    thickness = 1.dp
+                )
+            }
+
+            // Google Login Button
+            OutlinedButton(
+                onClick = {
+                    // Google Sign In (mock navigation since real integration requires Play Services flow)
+                    onNavigate(Main)
+                },
                 modifier = Modifier
-                    .clickable(enabled = !isLoading) { onNavigate(Register) }
-                    .padding(top = 8.dp),
-                color = OutlineColor,
-                textAlign = TextAlign.Center
-            )
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color.White,
+                    contentColor = Color(0xFF1E2022)
+                ),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = OutlineVariantColor
+                ),
+                enabled = !isLoading
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    GoogleIcon(modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Login with Google",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E2022)
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.padding(top = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "New to Mind Card? ",
+                    color = OutlineColor,
+                    fontSize = 15.sp
+                )
+                Text(
+                    text = "Sign up here",
+                    color = PrimaryIndigo,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    modifier = Modifier.clickable(enabled = !isLoading) { onNavigate(Register) }
+                )
+            }
         }
     }
 }
@@ -266,8 +432,8 @@ fun RegisterScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFFE1E0FF),
-                        BackgroundFrost
+                        Color(0xFFE8E7FF), // Light purple/indigo
+                        Color(0xFFE8F8EC)  // Light green/teal
                     )
                 )
             )
@@ -277,27 +443,37 @@ fun RegisterScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White.copy(alpha = 0.9f), RoundedCornerShape(24.dp))
-                .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                .shadow(
+                    elevation = 16.dp,
+                    shape = RoundedCornerShape(32.dp),
+                    clip = false
+                )
+                .background(Color.White.copy(alpha = 0.95f), RoundedCornerShape(32.dp))
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // Circular Logo Icon
             Box(
                 modifier = Modifier
-                    .size(64.dp)
-                    .background(PrimaryIndigo, RoundedCornerShape(16.dp))
-                    .border(2.dp, DarkIndigo, RoundedCornerShape(16.dp)),
+                    .size(72.dp)
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(PrimaryIndigo, DarkIndigo)
+                        ),
+                        CircleShape
+                    )
+                    .shadow(4.dp, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text("🚀", fontSize = 32.sp)
+                Text("🚀", fontSize = 36.sp)
             }
 
             Text(
                 text = "Create Account",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                color = PrimaryIndigo
+                color = Color(0xFF1E2022)
             )
 
             Text(
@@ -317,57 +493,137 @@ fun RegisterScreen(
                 )
             }
 
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Full Name") },
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                shape = RoundedCornerShape(16.dp),
+            // Full Name Field Group
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Alex Mind Card") },
-                enabled = !isLoading,
-                singleLine = true
-            )
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "Full Name",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E2022),
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = OutlineColor) },
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Alex Mind Card", color = OutlineColor.copy(alpha = 0.5f)) },
+                    enabled = !isLoading,
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFFEFF1F8),
+                        unfocusedContainerColor = Color(0xFFEFF1F8),
+                        disabledContainerColor = Color(0xFFEFF1F8).copy(alpha = 0.6f),
+                        focusedBorderColor = PrimaryIndigo,
+                        unfocusedBorderColor = Color.Transparent,
+                        disabledBorderColor = Color.Transparent
+                    )
+                )
+            }
 
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Email Address") },
-                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
-                shape = RoundedCornerShape(16.dp),
+            // Email Address Field Group
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("alex@mindcard.com") },
-                enabled = !isLoading,
-                singleLine = true
-            )
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "Email Address",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E2022),
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = OutlineColor) },
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("alex@mindcard.com", color = OutlineColor.copy(alpha = 0.5f)) },
+                    enabled = !isLoading,
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFFEFF1F8),
+                        unfocusedContainerColor = Color(0xFFEFF1F8),
+                        disabledContainerColor = Color(0xFFEFF1F8).copy(alpha = 0.6f),
+                        focusedBorderColor = PrimaryIndigo,
+                        unfocusedBorderColor = Color.Transparent,
+                        disabledBorderColor = Color.Transparent
+                    )
+                )
+            }
 
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                shape = RoundedCornerShape(16.dp),
-                visualTransformation = PasswordVisualTransformation(),
+            // Password Field Group
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("••••••••") },
-                enabled = !isLoading,
-                singleLine = true
-            )
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "Password",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E2022),
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = OutlineColor) },
+                    shape = RoundedCornerShape(20.dp),
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("••••••••", color = OutlineColor.copy(alpha = 0.5f)) },
+                    enabled = !isLoading,
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFFEFF1F8),
+                        unfocusedContainerColor = Color(0xFFEFF1F8),
+                        disabledContainerColor = Color(0xFFEFF1F8).copy(alpha = 0.6f),
+                        focusedBorderColor = PrimaryIndigo,
+                        unfocusedBorderColor = Color.Transparent,
+                        disabledBorderColor = Color.Transparent
+                    )
+                )
+            }
 
-            OutlinedTextField(
-                value = confirmPassword,
-                onValueChange = { confirmPassword = it },
-                label = { Text("Confirm Password") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                shape = RoundedCornerShape(16.dp),
-                visualTransformation = PasswordVisualTransformation(),
+            // Confirm Password Field Group
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("••••••••") },
-                enabled = !isLoading,
-                singleLine = true
-            )
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "Confirm Password",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E2022),
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = OutlineColor) },
+                    shape = RoundedCornerShape(20.dp),
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("••••••••", color = OutlineColor.copy(alpha = 0.5f)) },
+                    enabled = !isLoading,
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFFEFF1F8),
+                        unfocusedContainerColor = Color(0xFFEFF1F8),
+                        disabledContainerColor = Color(0xFFEFF1F8).copy(alpha = 0.6f),
+                        focusedBorderColor = PrimaryIndigo,
+                        unfocusedBorderColor = Color.Transparent,
+                        disabledBorderColor = Color.Transparent
+                    )
+                )
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             SquishyButton(
                 onClick = {
@@ -413,14 +669,24 @@ fun RegisterScreen(
                 isLoading = isLoading
             )
 
-            Text(
-                text = "Already have an account? Login",
-                modifier = Modifier
-                    .clickable(enabled = !isLoading) { onNavigate(Login) }
-                    .padding(top = 8.dp),
-                color = OutlineColor,
-                textAlign = TextAlign.Center
-            )
+            Row(
+                modifier = Modifier.padding(top = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Already have an account? ",
+                    color = OutlineColor,
+                    fontSize = 15.sp
+                )
+                Text(
+                    text = "Login",
+                    color = PrimaryIndigo,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    modifier = Modifier.clickable(enabled = !isLoading) { onNavigate(Login) }
+                )
+            }
         }
     }
 }
@@ -442,8 +708,8 @@ fun ForgotPasswordScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFFE1E0FF),
-                        BackgroundFrost
+                        Color(0xFFE8E7FF), // Light purple/indigo
+                        Color(0xFFE8F8EC)  // Light green/teal
                     )
                 )
             )
@@ -453,27 +719,33 @@ fun ForgotPasswordScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White.copy(alpha = 0.9f), RoundedCornerShape(24.dp))
-                .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                .shadow(
+                    elevation = 16.dp,
+                    shape = RoundedCornerShape(32.dp),
+                    clip = false
+                )
+                .background(Color.White.copy(alpha = 0.95f), RoundedCornerShape(32.dp))
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (!sentSuccess) {
+                // Circular Icon
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
-                        .background(Color(0xFFE1E0FF), RoundedCornerShape(16.dp)),
+                        .size(72.dp)
+                        .background(Color(0xFFEFF1F8), CircleShape)
+                        .shadow(2.dp, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("🔑", fontSize = 32.sp)
+                    Text("🔑", fontSize = 36.sp)
                 }
 
                 Text(
                     text = "Forgot Password?",
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
-                    color = PrimaryIndigo
+                    color = Color(0xFF1E2022)
                 )
 
                 Text(
@@ -494,19 +766,39 @@ fun ForgotPasswordScreen(
                     )
                 }
 
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("Email Address") },
-                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
-                    shape = RoundedCornerShape(16.dp),
+                // Email Address Field Group
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("name@example.com") },
-                    enabled = !isLoading,
-                    singleLine = true
-                )
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Email Address",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E2022),
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = OutlineColor) },
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("name@example.com", color = OutlineColor.copy(alpha = 0.5f)) },
+                        enabled = !isLoading,
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color(0xFFEFF1F8),
+                            unfocusedContainerColor = Color(0xFFEFF1F8),
+                            disabledContainerColor = Color(0xFFEFF1F8).copy(alpha = 0.6f),
+                            focusedBorderColor = PrimaryIndigo,
+                            unfocusedBorderColor = Color.Transparent,
+                            disabledBorderColor = Color.Transparent
+                        )
+                    )
+                }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 SquishyButton(
                     onClick = {
@@ -537,13 +829,14 @@ fun ForgotPasswordScreen(
                         .clickable(enabled = !isLoading) { onNavigate(Login) }
                         .padding(top = 8.dp),
                     color = PrimaryIndigo,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(80.dp)
-                        .background(SuccessBg.copy(alpha = 0.2f), RoundedCornerShape(40.dp)),
+                        .background(SuccessBg.copy(alpha = 0.2f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("✅", fontSize = 40.sp)
