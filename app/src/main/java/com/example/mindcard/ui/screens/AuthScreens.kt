@@ -167,10 +167,11 @@ fun LoginScreen(
                     }
             } catch (e: ApiException) {
                 isLoading = false
-                errorMessage = "Google Sign In failed: ${e.localizedMessage}"
+                errorMessage = "Google Sign In ApiException (Code: ${e.statusCode}): ${e.localizedMessage}. Please verify SHA-1 settings on Firebase."
             }
         } else {
             isLoading = false
+            errorMessage = "Google Sign In cancelled or failed (Result Code: ${result.resultCode}). Please ensure your debug SHA-1 is added to Firebase Console."
         }
     }
 
