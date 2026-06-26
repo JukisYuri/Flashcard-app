@@ -1,4 +1,4 @@
-package com.example.gizmolearn.ui.screens
+package com.example.mindcard.ui.screens
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -28,11 +28,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
-import com.example.gizmolearn.FlashcardStudy
-import com.example.gizmolearn.Main
-import com.example.gizmolearn.StudyResult
-import com.example.gizmolearn.data.Card
-import com.example.gizmolearn.data.Database
+import com.example.mindcard.FlashcardStudy
+import com.example.mindcard.Main
+import com.example.mindcard.StudyResult
+import com.example.mindcard.data.Card
+import com.example.mindcard.data.Database
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

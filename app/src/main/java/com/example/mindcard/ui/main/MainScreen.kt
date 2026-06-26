@@ -1,4 +1,4 @@
-package com.example.gizmolearn.ui.main
+package com.example.mindcard.ui.main
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -34,14 +34,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
-import com.example.gizmolearn.CreateAI
-import com.example.gizmolearn.CreateDeck
-import com.example.gizmolearn.CreateCard
-import com.example.gizmolearn.FlashcardStudy
-import com.example.gizmolearn.data.Card
-import com.example.gizmolearn.data.Database
-import com.example.gizmolearn.data.Deck
-import com.example.gizmolearn.ui.screens.*
+import com.example.mindcard.CreateAI
+import com.example.mindcard.CreateDeck
+import com.example.mindcard.CreateCard
+import com.example.mindcard.FlashcardStudy
+import com.example.mindcard.data.Card
+import com.example.mindcard.data.Database
+import com.example.mindcard.data.Deck
+import com.example.mindcard.ui.screens.*
 
 
 enum class ActiveTab { Home, Lesson, Library, Progress, Profile }
@@ -73,7 +73,7 @@ fun MainScreen(
                             Text("🚀", fontSize = 18.sp)
                         }
                         Text(
-                            text = "GizmoLearn",
+                            text = "Mind Card",
                             fontWeight = FontWeight.Bold,
                             fontSize = 22.sp,
                             color = PrimaryIndigo

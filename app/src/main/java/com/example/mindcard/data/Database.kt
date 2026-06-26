@@ -1,4 +1,4 @@
-package com.example.gizmolearn.data
+package com.example.mindcard.data
 
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf

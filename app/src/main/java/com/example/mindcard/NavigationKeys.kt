@@ -1,4 +1,4 @@
-package com.example.gizmolearn
+package com.example.mindcard
 
 import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable

@@ -1,4 +1,4 @@
-package com.example.gizmolearn.theme
+package com.example.mindcard.theme
 
 import androidx.compose.ui.graphics.Color
 

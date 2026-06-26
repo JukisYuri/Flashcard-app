@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "705846448248",
+    "project_id": "mind-card-f446d",
+    "storage_bucket": "mind-card-f446d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:705846448248:android:81cf1b812afca104a15d8d",
+        "android_client_info": {
+          "package_name": "com.example.mindcard"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBpZ1QViYydiKuwnxC74PGLnIfGQK_0g8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -2,13 +2,14 @@ plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
+  alias(libs.plugins.google.services)
 }
 
 android {
-    namespace = "com.example.gizmolearn"
+    namespace = "com.example.mindcard"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.example.gizmolearn"
+        applicationId = "com.example.mindcard"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -86,5 +87,9 @@ dependencies {
   // Material Icons
   implementation("androidx.compose.material:material-icons-core")
   implementation("androidx.compose.material:material-icons-extended")
+
+  // Firebase Authentication
+  implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.auth)
 }
 

@@ -1,11 +1,11 @@
-package com.example.gizmolearn
+package com.example.mindcard
 
 import androidx.compose.runtime.Composable
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
-import com.example.gizmolearn.ui.main.MainScreen
-import com.example.gizmolearn.ui.screens.*
+import com.example.mindcard.ui.main.MainScreen
+import com.example.mindcard.ui.screens.*
 
 @Composable
 fun MainNavigation() {

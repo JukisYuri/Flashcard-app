@@ -1,4 +1,4 @@
-package com.example.gizmolearn.ui.screens
+package com.example.mindcard.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,12 +23,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
-import com.example.gizmolearn.CreateAI
-import com.example.gizmolearn.CreateCard
-import com.example.gizmolearn.Main
-import com.example.gizmolearn.data.Card
-import com.example.gizmolearn.data.Database
-import com.example.gizmolearn.data.Deck
+import com.example.mindcard.CreateAI
+import com.example.mindcard.CreateCard
+import com.example.mindcard.Main
+import com.example.mindcard.data.Card
+import com.example.mindcard.data.Database
+import com.example.mindcard.data.Deck
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -238,7 +238,7 @@ fun CreateAiScreen(
                     )
 
                     Text(
-                        text = "Tell Gizmo what you want to master today.",
+                        text = "Tell Mind Card what you want to master today.",
                         fontSize = 15.sp,
                         color = OutlineColor
                     )
@@ -340,7 +340,7 @@ fun CreateAiScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     CircularProgressIndicator(color = PrimaryIndigo)
-                    Text("Gizmo AI is crafting your flashcards...", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Mind Card AI is crafting your flashcards...", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
         }

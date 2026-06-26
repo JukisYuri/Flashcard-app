@@ -1,4 +1,4 @@
-package com.example.gizmolearn.ui.screens
+package com.example.mindcard.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,10 +22,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
-import com.example.gizmolearn.ForgotPassword
-import com.example.gizmolearn.Login
-import com.example.gizmolearn.Main
-import com.example.gizmolearn.Register
+import com.example.mindcard.ForgotPassword
+import com.example.mindcard.Login
+import com.example.mindcard.Main
+import com.example.mindcard.Register
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
 
 // Color palette definitions matching DESIGN.md
 val PrimaryIndigo = Color(0xFF4648D4)
@@ -46,38 +48,57 @@ fun SquishyButton(
     containerColor: Color = PrimaryIndigo,
     shadowColor: Color = DarkIndigo,
     textColor: Color = Color.White,
-    text: String
+    text: String,
+    enabled: Boolean = true,
+    isLoading: Boolean = false
 ) {
+    val clickableModifier = if (enabled && !isLoading) {
+        Modifier.clickable(onClick = onClick)
+    } else {
+        Modifier
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .background(containerColor, RoundedCornerShape(16.dp))
+            .then(clickableModifier)
+            .background(
+                if (enabled && !isLoading) containerColor else containerColor.copy(alpha = 0.6f),
+                RoundedCornerShape(16.dp)
+            )
             .border(
                 width = 2.dp,
-                color = shadowColor,
+                color = if (enabled && !isLoading) shadowColor else shadowColor.copy(alpha = 0.6f),
                 shape = RoundedCornerShape(16.dp)
             )
             .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = text,
+        if (isLoading) {
+            CircularProgressIndicator(
                 color = textColor,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.5.dp
             )
-            Spacer(modifier = Modifier.width(8.dp))
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = null,
-                tint = textColor,
-                modifier = Modifier.size(20.dp)
-            )
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = text,
+                    color = textColor,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = textColor,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }
@@ -87,8 +108,11 @@ fun LoginScreen(
     onNavigate: (NavKey) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val auth = FirebaseAuth.getInstance()
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = modifier
@@ -125,7 +149,7 @@ fun LoginScreen(
             }
 
             Text(
-                text = "GizmoLearn",
+                text = "Mind Card",
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
                 color = PrimaryIndigo
@@ -137,6 +161,17 @@ fun LoginScreen(
                 color = OutlineColor
             )
 
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage!!,
+                    color = Color.Red,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             // Email Field
@@ -147,7 +182,9 @@ fun LoginScreen(
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("learner@gizmo.com") }
+                placeholder = { Text("learner@mindcard.com") },
+                enabled = !isLoading,
+                singleLine = true
             )
 
             // Password Field
@@ -159,29 +196,49 @@ fun LoginScreen(
                 shape = RoundedCornerShape(16.dp),
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("••••••••") }
+                placeholder = { Text("••••••••") },
+                enabled = !isLoading,
+                singleLine = true
             )
 
             Text(
                 text = "Forgot Password?",
-                color = PrimaryIndigo,
+                color = if (isLoading) OutlineColor else PrimaryIndigo,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .align(Alignment.End)
-                    .clickable { onNavigate(ForgotPassword) }
+                    .clickable(enabled = !isLoading) { onNavigate(ForgotPassword) }
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             SquishyButton(
-                onClick = { onNavigate(Main) },
-                text = "Login"
+                onClick = {
+                    if (email.isBlank() || password.isBlank()) {
+                        errorMessage = "Please enter both email and password."
+                        return@SquishyButton
+                    }
+                    isLoading = true
+                    errorMessage = null
+                    auth.signInWithEmailAndPassword(email.trim(), password)
+                        .addOnCompleteListener { task ->
+                            isLoading = false
+                            if (task.isSuccessful) {
+                                onNavigate(Main)
+                            } else {
+                                errorMessage = task.exception?.localizedMessage ?: "Login failed."
+                            }
+                        }
+                },
+                text = "Login",
+                enabled = !isLoading,
+                isLoading = isLoading
             )
 
             Text(
-                text = "New to GizmoLearn? Sign up here",
+                text = "New to Mind Card? Sign up here",
                 modifier = Modifier
-                    .clickable { onNavigate(Register) }
+                    .clickable(enabled = !isLoading) { onNavigate(Register) }
                     .padding(top = 8.dp),
                 color = OutlineColor,
                 textAlign = TextAlign.Center
@@ -195,10 +252,13 @@ fun RegisterScreen(
     onNavigate: (NavKey) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val auth = FirebaseAuth.getInstance()
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = modifier
@@ -246,6 +306,17 @@ fun RegisterScreen(
                 color = OutlineColor
             )
 
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage!!,
+                    color = Color.Red,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
+
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -253,7 +324,9 @@ fun RegisterScreen(
                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Alex Gizmo") }
+                placeholder = { Text("Alex Mind Card") },
+                enabled = !isLoading,
+                singleLine = true
             )
 
             OutlinedTextField(
@@ -263,7 +336,9 @@ fun RegisterScreen(
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("alex@gizmo.com") }
+                placeholder = { Text("alex@mindcard.com") },
+                enabled = !isLoading,
+                singleLine = true
             )
 
             OutlinedTextField(
@@ -273,7 +348,10 @@ fun RegisterScreen(
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 shape = RoundedCornerShape(16.dp),
                 visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("••••••••") },
+                enabled = !isLoading,
+                singleLine = true
             )
 
             OutlinedTextField(
@@ -283,20 +361,62 @@ fun RegisterScreen(
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 shape = RoundedCornerShape(16.dp),
                 visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("••••••••") },
+                enabled = !isLoading,
+                singleLine = true
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             SquishyButton(
-                onClick = { onNavigate(Login) },
-                text = "Sign Up"
+                onClick = {
+                    if (name.isBlank() || email.isBlank() || password.isBlank() || confirmPassword.isBlank()) {
+                        errorMessage = "Please fill in all fields."
+                        return@SquishyButton
+                    }
+                    if (password.length < 6) {
+                        errorMessage = "Password must be at least 6 characters."
+                        return@SquishyButton
+                    }
+                    if (password != confirmPassword) {
+                        errorMessage = "Passwords do not match."
+                        return@SquishyButton
+                    }
+                    isLoading = true
+                    errorMessage = null
+                    auth.createUserWithEmailAndPassword(email.trim(), password)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                val user = auth.currentUser
+                                if (user != null && name.isNotBlank()) {
+                                    val profileUpdates = UserProfileChangeRequest.Builder()
+                                        .setDisplayName(name.trim())
+                                        .build()
+                                    user.updateProfile(profileUpdates)
+                                        .addOnCompleteListener {
+                                            isLoading = false
+                                            onNavigate(Main)
+                                        }
+                                } else {
+                                    isLoading = false
+                                    onNavigate(Main)
+                                }
+                            } else {
+                                isLoading = false
+                                errorMessage = task.exception?.localizedMessage ?: "Registration failed."
+                            }
+                        }
+                },
+                text = "Sign Up",
+                enabled = !isLoading,
+                isLoading = isLoading
             )
 
             Text(
                 text = "Already have an account? Login",
                 modifier = Modifier
-                    .clickable { onNavigate(Login) }
+                    .clickable(enabled = !isLoading) { onNavigate(Login) }
                     .padding(top = 8.dp),
                 color = OutlineColor,
                 textAlign = TextAlign.Center
@@ -310,8 +430,11 @@ fun ForgotPasswordScreen(
     onNavigate: (NavKey) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val auth = FirebaseAuth.getInstance()
     var email by remember { mutableStateOf("") }
     var sentSuccess by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = modifier
@@ -360,6 +483,17 @@ fun ForgotPasswordScreen(
                     textAlign = TextAlign.Center
                 )
 
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage!!,
+                        color = Color.Red,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
+
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
@@ -367,20 +501,40 @@ fun ForgotPasswordScreen(
                     leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("name@example.com") }
+                    placeholder = { Text("name@example.com") },
+                    enabled = !isLoading,
+                    singleLine = true
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 SquishyButton(
-                    onClick = { sentSuccess = true },
-                    text = "Send Reset Link"
+                    onClick = {
+                        if (email.isBlank()) {
+                            errorMessage = "Please enter your email address."
+                            return@SquishyButton
+                        }
+                        isLoading = true
+                        errorMessage = null
+                        auth.sendPasswordResetEmail(email.trim())
+                            .addOnCompleteListener { task ->
+                                isLoading = false
+                                if (task.isSuccessful) {
+                                    sentSuccess = true
+                                } else {
+                                    errorMessage = task.exception?.localizedMessage ?: "Failed to send reset email."
+                                }
+                            }
+                    },
+                    text = "Send Reset Link",
+                    enabled = !isLoading,
+                    isLoading = isLoading
                 )
 
                 Text(
                     text = "Back to Login",
                     modifier = Modifier
-                        .clickable { onNavigate(Login) }
+                        .clickable(enabled = !isLoading) { onNavigate(Login) }
                         .padding(top = 8.dp),
                     color = PrimaryIndigo,
                     fontWeight = FontWeight.Bold

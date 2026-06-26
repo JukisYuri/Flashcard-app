@@ -1,6 +1,6 @@
-package com.example.gizmolearn.ui.main
+package com.example.mindcard.ui.main
 
-import com.example.gizmolearn.data.DataRepository
+import com.example.mindcard.data.DataRepository
 import junit.framework.TestCase.assertEquals
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
