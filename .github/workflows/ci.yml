@@ -25,7 +25,6 @@ jobs:
 
   # Biên dịch và Test
   build-and-check:
-    needs: lint-commits
     runs-on: ubuntu-latest
 
     steps:
