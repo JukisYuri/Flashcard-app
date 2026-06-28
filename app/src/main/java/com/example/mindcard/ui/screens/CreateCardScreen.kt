@@ -18,30 +18,31 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import com.example.mindcard.Main
-import com.example.mindcard.data.Card
 import com.example.mindcard.data.Database
+import com.example.mindcard.ui.main.BackgroundFrost
+import com.example.mindcard.ui.main.OutlineColor
+import com.example.mindcard.ui.main.OutlineVariantColor
+import com.example.mindcard.ui.main.PrimaryIndigo
+import com.example.mindcard.ui.viewmodel.CreateCardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateCardScreen(
     deckId: String,
     onNavigate: (NavKey) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: CreateCardViewModel = viewModel()
 ) {
-    val deck = Database.decks.firstOrNull { it.id == deckId }
+    val deck = remember(deckId, Database.decks) {
+        Database.decks.firstOrNull { it.id == deckId }
+    }
     if (deck == null) {
         onNavigate(Main)
         return
     }
-
-    var englishWord by remember { mutableStateOf("") }
-    var pronunciation by remember { mutableStateOf("") }
-    var pos by remember { mutableStateOf("Noun") }
-    var definition by remember { mutableStateOf("") }
-    var exampleSentence by remember { mutableStateOf("") }
-    var synonyms by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -63,8 +64,9 @@ fun CreateCardScreen(
                 .padding(innerPadding)
                 .padding(24.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            // Card details input form
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -73,76 +75,63 @@ fun CreateCardScreen(
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                Text("Card Details", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
+
                 OutlinedTextField(
-                    value = englishWord,
-                    onValueChange = { englishWord = it },
-                    label = { Text("English Word") },
+                    value = viewModel.englishWord,
+                    onValueChange = { viewModel.englishWord = it },
+                    label = { Text("English Word/Phrase") },
                     placeholder = { Text("e.g. Serendipity") },
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
-                    value = pronunciation,
-                    onValueChange = { pronunciation = it },
-                    label = { Text("Pronunciation") },
+                    value = viewModel.pronunciation,
+                    onValueChange = { viewModel.pronunciation = it },
+                    label = { Text("Phonetic Pronunciation") },
                     placeholder = { Text("e.g. /ˌser.ənˈdɪp.ə.ti/") },
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // POS Selector Segmented Control
-                Column {
+                // Part of speech selector (Segmented Control style)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Part of Speech", fontSize = 12.sp, color = OutlineColor, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(BackgroundFrost, RoundedCornerShape(12.dp))
-                            .padding(4.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        listOf("Noun", "Verb", "Adj").forEach { category ->
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (pos == category) Color.White else Color.Transparent)
-                                    .clickable { pos = category }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
+                        listOf("Noun", "Verb", "Adjective").forEach { pos ->
+                            val selected = viewModel.pos == pos
+                            Button(
+                                onClick = { viewModel.pos = pos },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (selected) PrimaryIndigo else Color(0xFFEFF1F8),
+                                    contentColor = if (selected) Color.White else OutlineColor
+                                ),
+                                contentPadding = PaddingValues(0.dp),
+                                shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text(
-                                    text = category,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (pos == category) PrimaryIndigo else OutlineColor,
-                                    fontSize = 13.sp
-                                )
+                                Text(pos, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
-            }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White, RoundedCornerShape(20.dp))
-                    .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
                 OutlinedTextField(
-                    value = definition,
-                    onValueChange = { definition = it },
-                    label = { Text("Definition") },
-                    placeholder = { Text("Enter word definition...") },
+                    value = viewModel.definition,
+                    onValueChange = { viewModel.definition = it },
+                    label = { Text("Definition / Meaning") },
+                    placeholder = { Text("e.g. Sự tình cờ may mắn") },
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
-                    value = exampleSentence,
-                    onValueChange = { exampleSentence = it },
+                    value = viewModel.exampleSentence,
+                    onValueChange = { viewModel.exampleSentence = it },
                     label = { Text("Example Sentence") },
                     placeholder = { Text("Use the word in a sentence...") },
                     shape = RoundedCornerShape(12.dp),
@@ -150,8 +139,8 @@ fun CreateCardScreen(
                 )
 
                 OutlinedTextField(
-                    value = synonyms,
-                    onValueChange = { synonyms = it },
+                    value = viewModel.synonyms,
+                    onValueChange = { viewModel.synonyms = it },
                     label = { Text("Synonyms") },
                     placeholder = { Text("e.g. chance, luck") },
                     shape = RoundedCornerShape(12.dp),
@@ -161,22 +150,11 @@ fun CreateCardScreen(
 
             Button(
                 onClick = {
-                    if (englishWord.isNotEmpty() && definition.isNotEmpty()) {
-                        Database.addCardToDeck(
-                            deckId,
-                            Card(
-                                englishWord = englishWord,
-                                pronunciation = pronunciation,
-                                pos = pos,
-                                definition = definition,
-                                exampleSentence = exampleSentence,
-                                synonyms = synonyms
-                            )
-                        )
+                    viewModel.saveCard(deckId) {
                         onNavigate(Main)
                     }
                 },
-                enabled = englishWord.isNotEmpty() && definition.isNotEmpty(),
+                enabled = viewModel.englishWord.isNotEmpty() && viewModel.definition.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo)

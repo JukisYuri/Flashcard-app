@@ -1,5 +1,6 @@
 package com.example.mindcard.ui.main
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,15 +18,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.mindcard.data.Database
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mindcard.ui.screens.*
+import com.example.mindcard.ui.viewmodel.ProgressViewModel
 import java.util.Calendar
-import java.util.Locale
 
 @Composable
-fun ProgressScreen() {
-    val profile = Database.userProfile.value
-    var streakRestoreActive by remember { mutableStateOf(true) }
+fun ProgressScreen(
+    modifier: Modifier = Modifier,
+    viewModel: ProgressViewModel = viewModel()
+) {
+    val profile by viewModel.userProfile
 
     // Dynamic calendar calculation
     val calendar = remember { Calendar.getInstance() }
@@ -54,149 +57,106 @@ fun ProgressScreen() {
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Text("Your Progress", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E), modifier = Modifier.align(Alignment.Start))
+
+        // Month Year Header
         Text(
-            text = "My Progress",
-            fontSize = 24.sp,
+            text = "$monthName $currentYear",
+            fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF191C1E),
+            color = PrimaryIndigo,
             modifier = Modifier.align(Alignment.Start)
         )
 
-        // Streak badge container
-        Box(
-            modifier = Modifier
-                .size(160.dp)
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFFFFE083),
-                            Color(0xFFFFAD33)
-                        )
-                    ),
-                    CircleShape
-                ),
-            contentAlignment = Alignment.Center
+        // Calendar Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, OutlineVariantColor.copy(alpha = 0.5f))
         ) {
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("🔥", fontSize = 56.sp)
-                Text(
-                    text = "${profile.currentStreak}",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF231B00)
-                )
-                Text("Days Streak", fontSize = 12.sp, color = Color(0xFF231B00).copy(alpha = 0.7f))
-            }
-        }
-
-        Text(
-            text = if (profile.currentStreak > 0) "You're on fire!" else "Start learning today!",
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF191C1E)
-        )
-
-        Text(
-            text = "${profile.currentStreak} days learning streak. Keep it up!",
-            fontSize = 15.sp,
-            color = OutlineColor,
-            textAlign = TextAlign.Center
-        )
-
-        // Interactive Calendar Widget
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(24.dp))
-                .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Study Activity", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
-                Text("$monthName $currentYear", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Calendar days headers
-            val daysHeaders = listOf("S", "M", "T", "W", "T", "F", "S")
-            Row(modifier = Modifier.fillMaxWidth()) {
-                daysHeaders.forEach {
-                    Text(
-                        it,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Bold,
-                        color = OutlineColor,
-                        fontSize = 12.sp
-                    )
+                // Days of week header row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    val daysOfWeek = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
+                    daysOfWeek.forEach { day ->
+                        Text(
+                            text = day,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = OutlineColor
+                        )
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = OutlineVariantColor.copy(alpha = 0.5f))
 
-            // Calendar days layout
-            val chunked = cells.chunked(7)
-            chunked.forEach { week ->
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    week.forEach { day ->
-                        val dateStr = if (day != null) {
-                            String.format(Locale.getDefault(), "%04d-%02d-%02d", currentYear, currentMonth + 1, day)
-                        } else ""
-                        val studied = day != null && profile.studyHistory[dateStr] == true
-                        val isToday = day != null && day == todayDay
+                // Days grid rows
+                val rows = cells.chunked(7)
+                rows.forEach { week ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        week.forEach { day ->
+                            val key = if (day != null) String.format("%04d-%02d-%02d", currentYear, currentMonth + 1, day) else ""
+                            val studied = day != null && profile.studyHistory.containsKey(key)
+                            val isToday = day == todayDay
 
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .padding(4.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (day == null) Color.Transparent
-                                    else if (studied) SuccessBg.copy(alpha = 0.3f)
-                                    else if (isToday) PrimaryIndigo.copy(alpha = 0.2f)
-                                    else Color(0xFFF2F4F6)
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isToday) PrimaryIndigo else Color.Transparent,
-                                    shape = RoundedCornerShape(8.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (day != null) {
-                                Text(
-                                    day.toString(),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (studied) SecondaryGreen else if (isToday) PrimaryIndigo else Color(0xFF191C1E)
-                                )
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                                    .padding(4.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (studied) SecondaryGreen.copy(alpha = 0.2f)
+                                        else if (isToday) PrimaryIndigo.copy(alpha = 0.2f)
+                                        else Color(0xFFF2F4F6)
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isToday) PrimaryIndigo else Color.Transparent,
+                                        shape = RoundedCornerShape(8.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (day != null) {
+                                    Text(
+                                        day.toString(),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (studied) SecondaryGreen else if (isToday) PrimaryIndigo else Color(0xFF191C1E)
+                                    )
+                                }
                             }
                         }
+                        // Pad out shorter rows at the end
+                        if (week.size < 7) {
+                            Spacer(modifier = Modifier.weight((7 - week.size).toFloat()))
+                        }
                     }
-                    // Pad out shorter rows at the end
-                    if (week.size < 7) {
-                        Spacer(modifier = Modifier.weight((7 - week.size).toFloat()))
-                    }
+                    Spacer(modifier = Modifier.height(4.dp))
                 }
-                Spacer(modifier = Modifier.height(4.dp))
             }
         }
 
-        if (streakRestoreActive && profile.currentStreak == 0) {
+        if (viewModel.streakRestoreActive && profile.currentStreak == 0) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -212,8 +172,7 @@ fun ProgressScreen() {
                 }
                 Button(
                     onClick = {
-                        Database.updateUserProfile(profile.copy(currentStreak = 1))
-                        streakRestoreActive = false
+                        viewModel.restoreStreak()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
                     shape = RoundedCornerShape(8.dp),

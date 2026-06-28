@@ -25,17 +25,21 @@ import com.example.mindcard.Login
 import com.example.mindcard.data.Database
 import com.example.mindcard.ui.screens.*
 
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.mindcard.ui.viewmodel.HomeViewModel
+
 enum class ActiveTab { Home, Lesson, Library, Progress, Profile }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     onItemClick: (NavKey) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: HomeViewModel = viewModel()
 ) {
     var activeTab by remember { mutableStateOf(ActiveTab.Home) }
-    val profile by remember { Database.userProfile }
-    val decksList = Database.decks
+    val profile by viewModel.userProfile
+    val decksList = viewModel.decks
 
     Scaffold(
         topBar = {
@@ -131,8 +135,8 @@ fun MainScreen(
                 .padding(innerPadding)
         ) {
             when (activeTab) {
-                ActiveTab.Home -> HomeScreen(decksList, onItemClick)
-                ActiveTab.Lesson -> LessonScreen(decksList, onItemClick)
+                ActiveTab.Home -> HomeScreen(onItemClick = onItemClick, viewModel = viewModel)
+                ActiveTab.Lesson -> LessonScreen(onItemClick = onItemClick, viewModel = viewModel)
                 ActiveTab.Library -> LibraryScreen()
                 ActiveTab.Progress -> ProgressScreen()
                 ActiveTab.Profile -> ProfileScreen(onLogoutClick = { onItemClick(Login) })

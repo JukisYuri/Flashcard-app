@@ -24,12 +24,13 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import com.example.mindcard.ForgotPassword
-import com.example.mindcard.Login
 import com.example.mindcard.Main
 import com.example.mindcard.Register
 import com.example.mindcard.data.Database
+import com.example.mindcard.ui.viewmodel.AuthViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
@@ -39,15 +40,12 @@ import com.google.firebase.auth.GoogleAuthProvider
 @Composable
 fun LoginScreen(
     onNavigate: (NavKey) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: AuthViewModel = viewModel()
 ) {
     val auth = FirebaseAuth.getInstance()
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
     val context = LocalContext.current
+
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -56,10 +54,10 @@ fun LoginScreen(
             try {
                 val account = task.getResult(ApiException::class.java)!!
                 val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-                isLoading = true
+                viewModel.isLoading = true
                 auth.signInWithCredential(credential)
                     .addOnCompleteListener { authTask ->
-                        isLoading = false
+                        viewModel.isLoading = false
                         if (authTask.isSuccessful) {
                             val uid = auth.currentUser?.uid
                             if (uid != null) {
@@ -67,16 +65,16 @@ fun LoginScreen(
                             }
                             onNavigate(Main)
                         } else {
-                            errorMessage = authTask.exception?.localizedMessage ?: "Firebase Sign In with Google failed."
+                            viewModel.errorMessage = authTask.exception?.localizedMessage ?: "Firebase Sign In with Google failed."
                         }
                     }
             } catch (e: ApiException) {
-                isLoading = false
-                errorMessage = "Google Sign In ApiException (Code: ${e.statusCode}): ${e.localizedMessage}. Please verify SHA-1 settings on Firebase."
+                viewModel.isLoading = false
+                viewModel.errorMessage = "Google Sign In ApiException (Code: ${e.statusCode}): ${e.localizedMessage}. Please verify SHA-1 settings on Firebase."
             }
         } else {
-            isLoading = false
-            errorMessage = "Google Sign In cancelled or failed (Result Code: ${result.resultCode}). Please ensure your debug SHA-1 is added to Firebase Console."
+            viewModel.isLoading = false
+            viewModel.errorMessage = "Google Sign In cancelled or failed (Result Code: ${result.resultCode}). Please ensure your debug SHA-1 is added to Firebase Console."
         }
     }
 
@@ -86,17 +84,17 @@ fun LoginScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFFE8E7FF), // Light purple/indigo
-                        Color(0xFFE8F8EC)  // Light green/teal
+                        Color(0xFFE8E7FF),
+                        Color(0xFFE8F8EC)
                     )
                 )
-            )
-            .padding(24.dp),
+            ),
         contentAlignment = Alignment.Center
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(24.dp)
                 .shadow(
                     elevation = 16.dp,
                     shape = RoundedCornerShape(32.dp),
@@ -136,9 +134,9 @@ fun LoginScreen(
                 color = OutlineColor
             )
 
-            if (errorMessage != null) {
+            viewModel.errorMessage?.let { error ->
                 Text(
-                    text = errorMessage!!,
+                    text = error,
                     color = Color.Red,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -162,8 +160,8 @@ fun LoginScreen(
                     modifier = Modifier.padding(start = 4.dp)
                 )
                 OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
+                    value = viewModel.email,
+                    onValueChange = { viewModel.email = it },
                     leadingIcon = {
                         Icon(
                             Icons.Default.Email,
@@ -179,7 +177,7 @@ fun LoginScreen(
                             color = OutlineColor.copy(alpha = 0.5f)
                         )
                     },
-                    enabled = !isLoading,
+                    enabled = !viewModel.isLoading,
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color(0xFFEFF1F8),
@@ -205,8 +203,8 @@ fun LoginScreen(
                     modifier = Modifier.padding(start = 4.dp)
                 )
                 OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
+                    value = viewModel.password,
+                    onValueChange = { viewModel.password = it },
                     leadingIcon = {
                         Icon(
                             Icons.Default.Lock,
@@ -223,7 +221,7 @@ fun LoginScreen(
                         )
                     },
                     visualTransformation = PasswordVisualTransformation(),
-                    enabled = !isLoading,
+                    enabled = !viewModel.isLoading,
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color(0xFFEFF1F8),
@@ -239,12 +237,12 @@ fun LoginScreen(
             Box(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = "Forgot Password?",
-                    color = if (isLoading) OutlineColor else PrimaryIndigo,
+                    color = if (viewModel.isLoading) OutlineColor else PrimaryIndigo,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .clickable(enabled = !isLoading) { onNavigate(ForgotPassword) }
+                        .clickable(enabled = !viewModel.isLoading) { onNavigate(ForgotPassword) }
                 )
             }
 
@@ -252,29 +250,14 @@ fun LoginScreen(
 
             SquishyButton(
                 onClick = {
-                    if (email.isBlank() || password.isBlank()) {
-                        errorMessage = "Please enter both email and password."
-                        return@SquishyButton
+                    viewModel.login { uid ->
+                        Database.initializeUserPersistence(uid)
+                        onNavigate(Main)
                     }
-                    isLoading = true
-                    errorMessage = null
-                    auth.signInWithEmailAndPassword(email.trim(), password)
-                        .addOnCompleteListener { task ->
-                            isLoading = false
-                            if (task.isSuccessful) {
-                                val uid = auth.currentUser?.uid
-                                if (uid != null) {
-                                    Database.initializeUserPersistence(uid)
-                                }
-                                onNavigate(Main)
-                            } else {
-                                errorMessage = task.exception?.localizedMessage ?: "Login failed."
-                            }
-                        }
                 },
                 text = "Login",
-                enabled = !isLoading,
-                isLoading = isLoading
+                enabled = !viewModel.isLoading,
+                isLoading = viewModel.isLoading
             )
 
             // OR Divider
@@ -304,8 +287,8 @@ fun LoginScreen(
             // Google Login Button
             OutlinedButton(
                 onClick = {
-                    isLoading = true
-                    errorMessage = null
+                    viewModel.isLoading = true
+                    viewModel.errorMessage = null
                     val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                         .requestIdToken("705846448248-smuta58jre9j37as30g510flrai5g41h.apps.googleusercontent.com")
                         .requestEmail()
@@ -328,7 +311,7 @@ fun LoginScreen(
                     width = 1.dp,
                     color = OutlineVariantColor
                 ),
-                enabled = !isLoading
+                enabled = !viewModel.isLoading
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -360,7 +343,7 @@ fun LoginScreen(
                     color = PrimaryIndigo,
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
-                    modifier = Modifier.clickable(enabled = !isLoading) { onNavigate(Register) }
+                    modifier = Modifier.clickable(enabled = !viewModel.isLoading) { onNavigate(Register) }
                 )
             }
         }

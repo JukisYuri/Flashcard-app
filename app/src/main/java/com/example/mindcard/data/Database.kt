@@ -49,7 +49,7 @@ object Database {
     var currentSessionXp = 0
     var currentSessionTime = 0
 
-    private val db = FirebaseFirestore.getInstance()
+    private val db by lazy { FirebaseFirestore.getInstance() }
     private var profileListener: ListenerRegistration? = null
     private var decksListener: ListenerRegistration? = null
     private var currentUserId: String? = null

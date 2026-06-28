@@ -8,15 +8,14 @@ import com.example.mindcard.ui.main.MainScreen
 import com.example.mindcard.ui.screens.*
 
 import androidx.compose.runtime.remember
-import com.google.firebase.auth.FirebaseAuth
 import com.example.mindcard.data.Database
+import com.example.mindcard.data.repository.AuthRepository
 
 @Composable
 fun MainNavigation() {
-  val auth = remember { FirebaseAuth.getInstance() }
-  val currentUser = remember { auth.currentUser }
-  val initialScreen = if (currentUser != null) {
-      Database.initializeUserPersistence(currentUser.uid)
+  val authRepository = remember { AuthRepository() }
+  val initialScreen = if (authRepository.isUserSignedIn()) {
+      Database.initializeUserPersistence(authRepository.getCurrentUser()!!.uid)
       Main
   } else {
       Login
@@ -41,8 +40,7 @@ fun MainNavigation() {
           MainScreen(
             onItemClick = { navKey ->
               if (navKey == Login) {
-                FirebaseAuth.getInstance().signOut()
-                Database.clearPersistence()
+                authRepository.signOut()
                 backStack.clear()
                 backStack.add(Login)
               } else {

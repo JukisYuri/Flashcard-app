@@ -1,19 +1,19 @@
 package com.example.mindcard.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,41 +23,35 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import com.example.mindcard.CreateAI
 import com.example.mindcard.CreateCard
 import com.example.mindcard.Main
 import com.example.mindcard.data.Card
 import com.example.mindcard.data.Database
+import com.example.mindcard.ui.main.BackgroundFrost
+import com.example.mindcard.ui.main.OutlineColor
+import com.example.mindcard.ui.main.OutlineVariantColor
+import com.example.mindcard.ui.main.PrimaryIndigo
+import com.example.mindcard.ui.main.SecondaryGreen
+import com.example.mindcard.ui.viewmodel.CreateDeckViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateDeckScreen(
     deckId: String? = null,
     onNavigate: (NavKey) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: CreateDeckViewModel = viewModel()
 ) {
     val existingDeck = remember(deckId, Database.decks) {
         if (deckId != null) Database.decks.firstOrNull { it.id == deckId } else null
     }
 
-    var name by remember { mutableStateOf(existingDeck?.name ?: "") }
-    var category by remember { mutableStateOf(existingDeck?.category ?: "Languages") }
-    var showCategoryMenu by remember { mutableStateOf(false) }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-
-    // Card edit/delete state variables
-    var editingCard by remember { mutableStateOf<Card?>(null) }
-    var cardFrontEdit by remember { mutableStateOf("") }
-    var cardPronunciationEdit by remember { mutableStateOf("") }
-    var cardPosEdit by remember { mutableStateOf("Noun") }
-    var cardBackEdit by remember { mutableStateOf("") }
-    var cardExampleEdit by remember { mutableStateOf("") }
-    var cardSynonymsEdit by remember { mutableStateOf("") }
-    var showCardEditDialog by remember { mutableStateOf(false) }
-
-    var cardToDelete by remember { mutableStateOf<Card?>(null) }
-    var showCardDeleteConfirm by remember { mutableStateOf(false) }
+    LaunchedEffect(existingDeck) {
+        viewModel.initExistingDeck(existingDeck)
+    }
 
     Scaffold(
         topBar = {
@@ -70,12 +64,7 @@ fun CreateDeckScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        if (name.isNotEmpty()) {
-                            if (existingDeck != null) {
-                                Database.updateDeck(existingDeck.id, name, category)
-                            } else {
-                                Database.addDeck(name, category)
-                            }
+                        viewModel.saveDeck(existingDeck?.id) {
                             onNavigate(Main)
                         }
                     }) {
@@ -126,8 +115,8 @@ fun CreateDeckScreen(
 
                 // Name input
                 OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
+                    value = viewModel.name,
+                    onValueChange = { viewModel.name = it },
                     label = { Text("Set Name") },
                     placeholder = { Text("e.g. Spanish Verbs") },
                     shape = RoundedCornerShape(12.dp),
@@ -137,28 +126,28 @@ fun CreateDeckScreen(
                 // Category selector
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
-                        value = category,
+                        value = viewModel.category,
                         onValueChange = {},
                         label = { Text("Category") },
                         readOnly = true,
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth(),
                         trailingIcon = {
-                            IconButton(onClick = { showCategoryMenu = true }) {
+                            IconButton(onClick = { viewModel.showCategoryMenu = true }) {
                                 Text("▼", fontSize = 12.sp)
                             }
                         }
                     )
                     DropdownMenu(
-                        expanded = showCategoryMenu,
-                        onDismissRequest = { showCategoryMenu = false }
+                        expanded = viewModel.showCategoryMenu,
+                        onDismissRequest = { viewModel.showCategoryMenu = false }
                     ) {
                         listOf("Languages", "Science", "History", "Math").forEach { cat ->
                             DropdownMenuItem(
                                 text = { Text(cat) },
                                 onClick = {
-                                    category = cat
-                                    showCategoryMenu = false
+                                    viewModel.category = cat
+                                    viewModel.showCategoryMenu = false
                                 }
                             )
                         }
@@ -214,24 +203,12 @@ fun CreateDeckScreen(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     IconButton(
-                                        onClick = {
-                                            editingCard = card
-                                            cardFrontEdit = card.englishWord
-                                            cardPronunciationEdit = card.pronunciation
-                                            cardPosEdit = card.pos
-                                            cardBackEdit = card.definition
-                                            cardExampleEdit = card.exampleSentence
-                                            cardSynonymsEdit = card.synonyms
-                                            showCardEditDialog = true
-                                        }
+                                        onClick = { viewModel.startEditingCard(card) }
                                     ) {
                                         Icon(Icons.Default.Edit, contentDescription = "Edit Card", tint = PrimaryIndigo)
                                     }
                                     IconButton(
-                                        onClick = {
-                                            cardToDelete = card
-                                            showCardDeleteConfirm = true
-                                        }
+                                        onClick = { viewModel.confirmDeleteCard(card) }
                                     ) {
                                         Icon(Icons.Default.Delete, contentDescription = "Delete Card", tint = Color(0xFFBA1A1A))
                                     }
@@ -263,17 +240,12 @@ fun CreateDeckScreen(
 
                 Button(
                     onClick = {
-                        if (name.isNotEmpty()) {
-                            if (existingDeck != null) {
-                                Database.updateDeck(existingDeck.id, name, category)
-                                onNavigate(CreateCard(existingDeck.id))
-                            } else {
-                                val newDeck = Database.addDeck(name, category)
-                                onNavigate(CreateCard(newDeck.id))
-                            }
+                        viewModel.saveDeck(existingDeck?.id) {
+                            val targetDeckId = existingDeck?.id ?: Database.decks.last().id
+                            onNavigate(CreateCard(targetDeckId))
                         }
                     },
-                    enabled = name.isNotEmpty(),
+                    enabled = viewModel.name.isNotEmpty(),
                     colors = ButtonDefaults.buttonColors(containerColor = SecondaryGreen),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -284,7 +256,7 @@ fun CreateDeckScreen(
 
                 if (existingDeck != null) {
                     Button(
-                        onClick = { showDeleteConfirm = true },
+                        onClick = { viewModel.showDeleteConfirm = true },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFDAD6)),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -296,17 +268,17 @@ fun CreateDeckScreen(
         }
     }
 
-    if (showDeleteConfirm && existingDeck != null) {
+    if (viewModel.showDeleteConfirm && existingDeck != null) {
         AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
+            onDismissRequest = { viewModel.showDeleteConfirm = false },
             title = { Text("Delete Deck?", fontWeight = FontWeight.Bold) },
             text = { Text("Are you sure you want to delete this deck? This action cannot be undone.") },
             confirmButton = {
                 Button(
                     onClick = {
-                        Database.deleteDeck(existingDeck.id)
-                        showDeleteConfirm = false
-                        onNavigate(Main)
+                        viewModel.deleteDeck(existingDeck.id) {
+                            onNavigate(Main)
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBA1A1A))
                 ) {
@@ -314,95 +286,89 @@ fun CreateDeckScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
+                TextButton(onClick = { viewModel.showDeleteConfirm = false }) {
                     Text("Cancel")
                 }
             }
         )
     }
 
-    // Card Edit Dialog
-    if (showCardEditDialog && editingCard != null && existingDeck != null) {
+    // Card Edit Dialog Form
+    if (viewModel.showCardEditDialog && viewModel.editingCard != null && existingDeck != null) {
         AlertDialog(
-            onDismissRequest = { showCardEditDialog = false },
-            title = { Text("Edit Flashcard", fontWeight = FontWeight.Bold) },
+            onDismissRequest = { viewModel.showCardEditDialog = false },
+            title = { Text("Edit Card", fontWeight = FontWeight.Bold) },
             text = {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     OutlinedTextField(
-                        value = cardFrontEdit,
-                        onValueChange = { cardFrontEdit = it },
-                        label = { Text("English Word") },
+                        value = viewModel.cardFrontEdit,
+                        onValueChange = { viewModel.cardFrontEdit = it },
+                        label = { Text("English Word/Phrase") },
                         placeholder = { Text("e.g. Serendipity") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
 
                     OutlinedTextField(
-                        value = cardPronunciationEdit,
-                        onValueChange = { cardPronunciationEdit = it },
-                        label = { Text("Pronunciation") },
+                        value = viewModel.cardPronunciationEdit,
+                        onValueChange = { viewModel.cardPronunciationEdit = it },
+                        label = { Text("Phonetic Pronunciation") },
                         placeholder = { Text("e.g. /ˌser.ənˈdɪp.ə.ti/") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
 
-                    // Part of Speech Selector
-                    Column {
+                    // Part of speech selector (Segmented Control style)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Part of Speech", fontSize = 12.sp, color = OutlineColor, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(BackgroundFrost, RoundedCornerShape(12.dp))
-                                .padding(4.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            listOf("Noun", "Verb", "Adj").forEach { category ->
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (cardPosEdit == category) Color.White else Color.Transparent)
-                                        .clickable { cardPosEdit = category }
-                                        .padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
+                            listOf("Noun", "Verb", "Adjective").forEach { pos ->
+                                val selected = viewModel.cardPosEdit == pos
+                                Button(
+                                    onClick = { viewModel.cardPosEdit = pos },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (selected) PrimaryIndigo else Color(0xFFEFF1F8),
+                                        contentColor = if (selected) Color.White else OutlineColor
+                                    ),
+                                    contentPadding = PaddingValues(0.dp),
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text(
-                                        text = category,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (cardPosEdit == category) PrimaryIndigo else OutlineColor,
-                                        fontSize = 13.sp
-                                    )
+                                    Text(pos, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
                     }
 
                     OutlinedTextField(
-                        value = cardBackEdit,
-                        onValueChange = { cardBackEdit = it },
-                        label = { Text("Definition") },
-                        placeholder = { Text("Enter word definition...") },
+                        value = viewModel.cardBackEdit,
+                        onValueChange = { viewModel.cardBackEdit = it },
+                        label = { Text("Definition / Meaning") },
+                        placeholder = { Text("e.g. Sự tình cờ may mắn") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
 
                     OutlinedTextField(
-                        value = cardExampleEdit,
-                        onValueChange = { cardExampleEdit = it },
+                        value = viewModel.cardExampleEdit,
+                        onValueChange = { viewModel.cardExampleEdit = it },
                         label = { Text("Example Sentence") },
-                        placeholder = { Text("Write a sentence using this word...") },
+                        placeholder = { Text("e.g. We found the restaurant by serendipity.") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
 
                     OutlinedTextField(
-                        value = cardSynonymsEdit,
-                        onValueChange = { cardSynonymsEdit = it },
+                        value = viewModel.cardSynonymsEdit,
+                        onValueChange = { viewModel.cardSynonymsEdit = it },
                         label = { Text("Synonyms") },
                         placeholder = { Text("e.g. chance, accident") },
                         modifier = Modifier.fillMaxWidth(),
@@ -413,19 +379,7 @@ fun CreateDeckScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (cardFrontEdit.isNotBlank() && cardBackEdit.isNotBlank()) {
-                            Database.updateCardInDeckFull(
-                                deckId = existingDeck.id,
-                                cardId = editingCard!!.id,
-                                englishWord = cardFrontEdit,
-                                pronunciation = cardPronunciationEdit,
-                                pos = cardPosEdit,
-                                definition = cardBackEdit,
-                                exampleSentence = cardExampleEdit,
-                                synonyms = cardSynonymsEdit
-                            )
-                            showCardEditDialog = false
-                        }
+                        viewModel.saveCardEdit(existingDeck.id)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo)
                 ) {
@@ -433,7 +387,7 @@ fun CreateDeckScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showCardEditDialog = false }) {
+                TextButton(onClick = { viewModel.showCardEditDialog = false }) {
                     Text("Cancel")
                 }
             }
@@ -441,16 +395,15 @@ fun CreateDeckScreen(
     }
 
     // Card Delete Confirm Dialog
-    if (showCardDeleteConfirm && cardToDelete != null && existingDeck != null) {
+    if (viewModel.showCardDeleteConfirm && viewModel.cardToDelete != null && existingDeck != null) {
         AlertDialog(
-            onDismissRequest = { showCardDeleteConfirm = false },
+            onDismissRequest = { viewModel.showCardDeleteConfirm = false },
             title = { Text("Delete Card?", fontWeight = FontWeight.Bold) },
             text = { Text("Are you sure you want to delete this card from the deck?") },
             confirmButton = {
                 Button(
                     onClick = {
-                        Database.deleteCardFromDeck(existingDeck.id, cardToDelete!!.id)
-                        showCardDeleteConfirm = false
+                        viewModel.deleteCard(existingDeck.id)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBA1A1A))
                 ) {
@@ -458,7 +411,7 @@ fun CreateDeckScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showCardDeleteConfirm = false }) {
+                TextButton(onClick = { viewModel.showCardDeleteConfirm = false }) {
                     Text("Cancel")
                 }
             }

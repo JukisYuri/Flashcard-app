@@ -23,13 +23,19 @@ import com.example.mindcard.data.Database
 import com.example.mindcard.data.Deck
 import com.example.mindcard.ui.screens.*
 
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.mindcard.ui.viewmodel.HomeViewModel
+
 @Composable
 fun LessonScreen(
-    decks: List<Deck>,
-    onItemClick: (NavKey) -> Unit
+    onItemClick: (NavKey) -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: HomeViewModel = viewModel()
 ) {
+    val decks = viewModel.decks
+
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -42,7 +48,7 @@ fun LessonScreen(
                 subtitle = "Create a set first to start learning vocabulary.",
                 buttonText = "Create Set",
                 onClick = { onItemClick(CreateDeck()) },
-                onSeedClick = { Database.seedDemoData() }
+                onSeedClick = { viewModel.seedDemoData() }
             )
         } else {
             LazyColumn(

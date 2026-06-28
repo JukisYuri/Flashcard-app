@@ -14,19 +14,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.mindcard.data.Database
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mindcard.ui.screens.*
-import java.util.Calendar
+import com.example.mindcard.ui.viewmodel.ProfileViewModel
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 
 @Composable
 fun ProfileScreen(
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: ProfileViewModel = viewModel()
 ) {
-    val profile = Database.userProfile.value
-    var isEditingName by remember { mutableStateOf(false) }
-    var editNameInput by remember { mutableStateOf(profile.name) }
+    val profile by viewModel.userProfile
 
     // Dynamic weekly activity calculation
     val weekDaysInfo = remember(profile.studyHistory) {
@@ -63,7 +64,7 @@ fun ProfileScreen(
     val activeDaysCount = remember(weekDaysInfo) { weekDaysInfo.count { it.second } }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -117,7 +118,7 @@ fun ProfileScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Button(
-                        onClick = { isEditingName = true },
+                        onClick = { viewModel.startEditing() },
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
                         modifier = Modifier.weight(1f)
@@ -204,30 +205,27 @@ fun ProfileScreen(
         }
     }
 
-    if (isEditingName) {
+    if (viewModel.isEditingName) {
         AlertDialog(
-            onDismissRequest = { isEditingName = false },
+            onDismissRequest = { viewModel.cancelEditing() },
             title = { Text("Edit Name") },
             text = {
                 OutlinedTextField(
-                    value = editNameInput,
-                    onValueChange = { editNameInput = it },
+                    value = viewModel.editNameInput,
+                    onValueChange = { viewModel.editNameInput = it },
                     label = { Text("Display Name") }
                 )
             },
             confirmButton = {
                 Button(
-                    onClick = {
-                        Database.updateProfileName(editNameInput)
-                        isEditingName = false
-                    },
+                    onClick = { viewModel.saveProfileName() },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo)
                 ) {
                     Text("Save")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { isEditingName = false }) {
+                TextButton(onClick = { viewModel.cancelEditing() }) {
                     Text("Cancel")
                 }
             }

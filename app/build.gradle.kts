@@ -16,6 +16,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         val properties = Properties()
         val localPropertiesFile = project.rootProject.file("local.properties")
@@ -93,6 +94,7 @@ dependencies {
   implementation(libs.androidx.navigation3.ui)
   implementation(libs.androidx.navigation3.runtime)
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+  implementation(libs.androidx.lifecycle.viewmodel.compose)
 
   // Material Icons
   implementation("androidx.compose.material:material-icons-core")

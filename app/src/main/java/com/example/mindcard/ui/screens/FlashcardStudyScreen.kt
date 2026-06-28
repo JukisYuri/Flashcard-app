@@ -1,7 +1,6 @@
 package com.example.mindcard.ui.screens
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,7 +9,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,61 +21,61 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import com.example.mindcard.Main
 import com.example.mindcard.StudyResult
-import com.example.mindcard.CreateDeck
 import com.example.mindcard.data.Database
+import com.example.mindcard.ui.main.BackgroundFrost
+import com.example.mindcard.ui.main.OutlineColor
+import com.example.mindcard.ui.main.OutlineVariantColor
+import com.example.mindcard.ui.main.PrimaryIndigo
+import com.example.mindcard.ui.main.SecondaryGreen
+import com.example.mindcard.ui.viewmodel.StudyViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FlashcardStudyScreen(
     deckId: String,
     onNavigate: (NavKey) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: StudyViewModel = viewModel()
 ) {
-    val deck = Database.decks.firstOrNull { it.id == deckId }
+    val deck = remember(deckId, Database.decks) {
+        Database.decks.firstOrNull { it.id == deckId }
+    }
     if (deck == null) {
         onNavigate(Main)
         return
     }
 
-    val cards = deck.cards
-    if (cards.isEmpty()) {
-        onNavigate(Main)
+    LaunchedEffect(deck) {
+        viewModel.startStudySession(deck)
+    }
+
+    val currentDeck = viewModel.currentDeck
+    if (currentDeck == null || currentDeck.cards.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = PrimaryIndigo)
+        }
         return
     }
 
-    var currentIndex by remember { mutableStateOf(0) }
-    var isFlipped by remember { mutableStateOf(false) }
-    var correctAnswers by remember { mutableStateOf(0) }
-    val currentCard = cards[currentIndex]
-
-
+    val cards = currentDeck.cards
+    val currentCard = cards[viewModel.currentCardIndex]
 
     // Rotate transition for flip card
     val rotation by animateFloatAsState(
-        targetValue = if (isFlipped) 180f else 0f,
-        animationSpec = tween(durationMillis = 500)
+        targetValue = if (viewModel.isCardFlipped) 180f else 0f
     )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(deck.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
-                        Text("${currentIndex + 1} / ${cards.size}", fontSize = 12.sp, color = OutlineColor)
-                    }
-                },
+                title = { Text(currentDeck.name, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { onNavigate(Main) }) {
                         Icon(Icons.Default.Close, contentDescription = "Close")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { onNavigate(CreateDeck(deckId)) }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundFrost)
@@ -86,67 +84,75 @@ fun FlashcardStudyScreen(
         containerColor = BackgroundFrost
     ) { innerPadding ->
         Column(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Progress Bar
-            LinearProgressIndicator(
-                progress = { (currentIndex + 1).toFloat() / cards.size.toFloat() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(CircleShape),
-                color = SecondaryGreen,
-                trackColor = OutlineVariantColor.copy(alpha = 0.3f)
-            )
-
-            // Category Badge
-            Box(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(Color(0xFFE1E0FF))
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            // Progress indicators
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = currentCard.pos.uppercase(),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PrimaryIndigo
+                LinearProgressIndicator(
+                    progress = { (viewModel.currentCardIndex.toFloat() / cards.size) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    color = PrimaryIndigo,
+                    trackColor = OutlineVariantColor
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "CARD ${viewModel.currentCardIndex + 1} OF ${cards.size}",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = OutlineColor
+                    )
+                }
             }
 
-            // Interactive Flipping Card
+            // Flashcard container
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(0.8f)
+                    .weight(1f)
+                    .padding(vertical = 32.dp)
                     .graphicsLayer {
                         rotationY = rotation
-                        cameraDistance = 12 * density
+                        cameraDistance = 12f * density
                     }
-                    .clickable { isFlipped = !isFlipped }
-                    .background(
-                        if (rotation > 90f) SuccessBg.copy(alpha = 0.1f) else Color.White,
-                        RoundedCornerShape(24.dp)
-                    )
-                    .border(
-                        width = 2.dp,
-                        color = if (rotation > 90f) SecondaryGreen else PrimaryIndigo.copy(alpha = 0.3f),
-                        shape = RoundedCornerShape(24.dp)
-                    )
-                    .padding(24.dp),
+                    .clickable { viewModel.isCardFlipped = !viewModel.isCardFlipped }
+                    .background(Color.White, RoundedCornerShape(24.dp))
+                    .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(24.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 if (rotation <= 90f) {
-                    // Front side
+                    // FRONT SIDE
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.padding(24.dp)
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .background(PrimaryIndigo.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = currentCard.pos,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PrimaryIndigo
+                            )
+                        }
+
                         Text(
                             text = currentCard.englishWord,
                             fontSize = 32.sp,
@@ -154,48 +160,58 @@ fun FlashcardStudyScreen(
                             color = Color(0xFF191C1E),
                             textAlign = TextAlign.Center
                         )
+
                         Text(
                             text = currentCard.pronunciation,
-                            fontSize = 18.sp,
-                            color = OutlineColor,
-                            textAlign = TextAlign.Center
+                            fontSize = 16.sp,
+                            fontStyle = FontStyle.Italic,
+                            color = OutlineColor
                         )
+
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Tap to flip",
+                            text = "Tap to reveal translation",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OutlineVariantColor,
-                            modifier = Modifier.padding(top = 32.dp)
+                            color = OutlineColor.copy(alpha = 0.6f)
                         )
                     }
                 } else {
-                    // Back side (needs Y flip back to prevent mirror image)
+                    // BACK SIDE
                     Column(
-                        modifier = Modifier.graphicsLayer { rotationY = 180f },
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier
+                            .graphicsLayer { rotationY = 180f }
+                            .padding(24.dp)
                     ) {
                         Text(
-                            text = currentCard.englishWord,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = SecondaryGreen,
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
                             text = currentCard.definition,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF191C1E),
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryIndigo,
                             textAlign = TextAlign.Center
                         )
+
+                        if (currentCard.synonyms.isNotEmpty()) {
+                            Text(
+                                text = "Synonyms: ${currentCard.synonyms}",
+                                fontSize = 14.sp,
+                                color = OutlineColor,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
                         if (currentCard.exampleSentence.isNotEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(BackgroundFrost, RoundedCornerShape(12.dp))
-                                    .padding(12.dp)
-                            ) {
+                            HorizontalDivider(color = OutlineVariantColor.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "Example:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = OutlineColor.copy(alpha = 0.8f)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "\"${currentCard.exampleSentence}\"",
                                     fontSize = 14.sp,
@@ -211,9 +227,9 @@ fun FlashcardStudyScreen(
             }
 
             // Controls
-            if (!isFlipped) {
+            if (!viewModel.isCardFlipped) {
                 Button(
-                    onClick = { isFlipped = true },
+                    onClick = { viewModel.isCardFlipped = true },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo)
@@ -233,11 +249,8 @@ fun FlashcardStudyScreen(
                         borderColor = Color(0xFFFFDAD6),
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            isFlipped = false
-                            if (currentIndex < cards.size - 1) {
-                                currentIndex++
-                            } else {
-                                finishSession(deck.id, cards.size, correctAnswers, onNavigate)
+                            viewModel.handleFeedback("Again") { accuracy, xp ->
+                                onNavigate(StudyResult(deckId = deck.id, accuracy = accuracy, xpEarned = xp, timeMinutes = 1))
                             }
                         }
                     )
@@ -250,12 +263,8 @@ fun FlashcardStudyScreen(
                         borderColor = Color(0xFFFFE083),
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            isFlipped = false
-                            correctAnswers++
-                            if (currentIndex < cards.size - 1) {
-                                currentIndex++
-                            } else {
-                                finishSession(deck.id, cards.size, correctAnswers, onNavigate)
+                            viewModel.handleFeedback("Hard") { accuracy, xp ->
+                                onNavigate(StudyResult(deckId = deck.id, accuracy = accuracy, xpEarned = xp, timeMinutes = 1))
                             }
                         }
                     )
@@ -268,12 +277,8 @@ fun FlashcardStudyScreen(
                         borderColor = SuccessBg,
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            isFlipped = false
-                            correctAnswers++
-                            if (currentIndex < cards.size - 1) {
-                                currentIndex++
-                            } else {
-                                finishSession(deck.id, cards.size, correctAnswers, onNavigate)
+                            viewModel.handleFeedback("Easy") { accuracy, xp ->
+                                onNavigate(StudyResult(deckId = deck.id, accuracy = accuracy, xpEarned = xp, timeMinutes = 1))
                             }
                         }
                     )
@@ -281,16 +286,6 @@ fun FlashcardStudyScreen(
             }
         }
     }
-
-}
-
-private fun finishSession(deckId: String, total: Int, correct: Int, onNavigate: (NavKey) -> Unit) {
-    val accuracy = ((correct.toFloat() / total.toFloat()) * 100).toInt()
-    val xp = correct * 30 + 100 // 30 XP per correct + 100 completion bonus
-    val time = 1 // 1 minute simulation
-
-    Database.recordStudySession(deckId, accuracy, xp, time)
-    onNavigate(StudyResult(deckId, accuracy, xp, time))
 }
 
 @Composable

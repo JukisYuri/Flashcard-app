@@ -18,20 +18,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import com.example.mindcard.Login
-import com.google.firebase.auth.FirebaseAuth
+import com.example.mindcard.ui.viewmodel.AuthViewModel
 
 @Composable
 fun ForgotPasswordScreen(
     onNavigate: (NavKey) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: AuthViewModel = viewModel()
 ) {
-    val auth = FirebaseAuth.getInstance()
-    var email by remember { mutableStateOf("") }
     var sentSuccess by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = modifier
@@ -39,8 +37,8 @@ fun ForgotPasswordScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFFE8E7FF), // Light purple/indigo
-                        Color(0xFFE8F8EC)  // Light green/teal
+                        Color(0xFFE8E7FF),
+                        Color(0xFFE8F8EC)
                     )
                 )
             )
@@ -80,24 +78,23 @@ fun ForgotPasswordScreen(
                 )
 
                 Text(
-                    text = "Enter your email and we'll send you a recovery link.",
-                    fontSize = 15.sp,
+                    text = "Enter your email address and we'll send you a link to reset your password.",
+                    fontSize = 14.sp,
                     color = OutlineColor,
                     textAlign = TextAlign.Center
                 )
 
-                if (errorMessage != null) {
+                viewModel.errorMessage?.let { error ->
                     Text(
-                        text = errorMessage!!,
+                        text = error,
                         color = Color.Red,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(vertical = 4.dp),
                         textAlign = TextAlign.Center
                     )
                 }
 
-                // Email Address Field Group
+                // Email Field Group
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -110,13 +107,13 @@ fun ForgotPasswordScreen(
                         modifier = Modifier.padding(start = 4.dp)
                     )
                     OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
+                        value = viewModel.email,
+                        onValueChange = { viewModel.email = it },
                         leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = OutlineColor) },
                         shape = RoundedCornerShape(20.dp),
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("name@example.com", color = OutlineColor.copy(alpha = 0.5f)) },
-                        enabled = !isLoading,
+                        placeholder = { Text("learner@mindcard.com", color = OutlineColor.copy(alpha = 0.5f)) },
+                        enabled = !viewModel.isLoading,
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color(0xFFEFF1F8),
@@ -133,67 +130,52 @@ fun ForgotPasswordScreen(
 
                 SquishyButton(
                     onClick = {
-                        if (email.isBlank()) {
-                            errorMessage = "Please enter your email address."
-                            return@SquishyButton
+                        viewModel.sendPasswordReset {
+                            sentSuccess = true
                         }
-                        isLoading = true
-                        errorMessage = null
-                        auth.sendPasswordResetEmail(email.trim())
-                            .addOnCompleteListener { task ->
-                                isLoading = false
-                                if (task.isSuccessful) {
-                                    sentSuccess = true
-                                } else {
-                                    errorMessage = task.exception?.localizedMessage ?: "Failed to send reset email."
-                                }
-                            }
                     },
                     text = "Send Reset Link",
-                    enabled = !isLoading,
-                    isLoading = isLoading
-                )
-
-                Text(
-                    text = "Back to Login",
-                    modifier = Modifier
-                        .clickable(enabled = !isLoading) { onNavigate(Login) }
-                        .padding(top = 8.dp),
-                    color = PrimaryIndigo,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
+                    enabled = !viewModel.isLoading,
+                    isLoading = viewModel.isLoading
                 )
             } else {
+                // Success State Card
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
-                        .background(SuccessBg.copy(alpha = 0.2f), CircleShape),
+                        .size(72.dp)
+                        .background(Color(0xFFE8F8EC), CircleShape)
+                        .shadow(2.dp, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("✅", fontSize = 40.sp)
+                    Text("✉️", fontSize = 36.sp)
                 }
 
                 Text(
-                    text = "Link Sent!",
-                    fontSize = 28.sp,
+                    text = "Email Sent!",
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
-                    color = SecondaryGreen
+                    color = Color(0xFF1E2022)
                 )
 
                 Text(
-                    text = "We've sent a password reset link to $email. Please check your inbox.",
-                    fontSize = 16.sp,
+                    text = "A password reset link has been sent to ${viewModel.email}. Please check your inbox and spam folders.",
+                    fontSize = 14.sp,
                     color = OutlineColor,
                     textAlign = TextAlign.Center
                 )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                SquishyButton(
-                    onClick = { onNavigate(Login) },
-                    text = "Back to Login"
-                )
             }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "Back to Login",
+                color = if (viewModel.isLoading) OutlineColor else PrimaryIndigo,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                modifier = Modifier
+                    .clickable(enabled = !viewModel.isLoading) { onNavigate(Login) }
+                    .padding(vertical = 4.dp)
+            )
         }
     }
 }

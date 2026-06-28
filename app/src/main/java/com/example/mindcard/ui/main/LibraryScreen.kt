@@ -25,39 +25,32 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mindcard.data.Card
-import com.example.mindcard.data.Database
 import com.example.mindcard.ui.screens.*
+import com.example.mindcard.ui.viewmodel.LibraryViewModel
 
 @Composable
-fun LibraryScreen() {
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedLetter by remember { mutableStateOf<Char?>(null) }
-
-    // Aggregate all cards from all decks
-    val allCards = remember { Database.decks.flatMap { deck -> deck.cards } }
-
-    val filteredCards = allCards.filter { card ->
-        val matchesQuery = card.englishWord.contains(searchQuery, ignoreCase = true) ||
-                card.definition.contains(searchQuery, ignoreCase = true)
-        val matchesLetter = selectedLetter == null ||
-                card.englishWord.startsWith(selectedLetter.toString(), ignoreCase = true)
-        matchesQuery && matchesLetter
-    }
+fun LibraryScreen(
+    modifier: Modifier = Modifier,
+    viewModel: LibraryViewModel = viewModel()
+) {
+    val totalCount = viewModel.getAllCardsCount()
+    val filteredCards = viewModel.getFilteredCards()
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("My Library", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
-        Text("Review all ${allCards.size} words you've learned so far.", fontSize = 14.sp, color = OutlineColor)
+        Text("Review all $totalCount words you've learned so far.", fontSize = 14.sp, color = OutlineColor)
 
         // Search Bar
         OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
+            value = viewModel.searchQuery,
+            onValueChange = { viewModel.searchQuery = it },
             placeholder = { Text("Search words, definitions...") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             shape = RoundedCornerShape(24.dp),
@@ -78,13 +71,13 @@ fun LibraryScreen() {
                 Box(
                     modifier = Modifier
                         .clip(CircleShape)
-                        .background(if (selectedLetter == null) PrimaryIndigo else OutlineVariantColor.copy(alpha = 0.2f))
-                        .clickable { selectedLetter = null }
+                        .background(if (viewModel.selectedLetter == null) PrimaryIndigo else OutlineVariantColor.copy(alpha = 0.2f))
+                        .clickable { viewModel.selectedLetter = null }
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Text(
                         "All",
-                        color = if (selectedLetter == null) Color.White else OutlineColor,
+                        color = if (viewModel.selectedLetter == null) Color.White else OutlineColor,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -94,14 +87,14 @@ fun LibraryScreen() {
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(if (selectedLetter == letter) PrimaryIndigo else OutlineVariantColor.copy(alpha = 0.2f))
-                        .clickable { selectedLetter = if (selectedLetter == letter) null else letter }
+                        .background(if (viewModel.selectedLetter == letter) PrimaryIndigo else OutlineVariantColor.copy(alpha = 0.2f))
+                        .clickable { viewModel.selectedLetter = if (viewModel.selectedLetter == letter) null else letter }
                         .padding(8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         letter.toString(),
-                        color = if (selectedLetter == letter) Color.White else OutlineColor,
+                        color = if (viewModel.selectedLetter == letter) Color.White else OutlineColor,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -116,7 +109,7 @@ fun LibraryScreen() {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (allCards.isEmpty()) "No words in your library yet.\nStart learning a deck to add words!" else "No search results matches.",
+                    text = if (totalCount == 0) "No words in your library yet.\nStart learning a deck to add words!" else "No search results matches.",
                     textAlign = TextAlign.Center,
                     color = OutlineColor,
                     fontSize = 15.sp
