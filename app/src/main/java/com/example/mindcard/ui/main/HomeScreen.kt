@@ -95,7 +95,7 @@ fun HomeScreen(
                 title = "No flashcard sets yet",
                 subtitle = "Start by creating a deck manually or using AI.",
                 buttonText = "Create Deck",
-                onClick = { onItemClick(CreateDeck) },
+                onClick = { onItemClick(CreateDeck()) },
                 onSeedClick = { Database.seedDemoData() }
             )
         } else {

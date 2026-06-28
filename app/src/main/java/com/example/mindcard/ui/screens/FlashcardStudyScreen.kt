@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
 import com.example.mindcard.Main
 import com.example.mindcard.StudyResult
+import com.example.mindcard.CreateDeck
 import com.example.mindcard.data.Database
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,6 +53,8 @@ fun FlashcardStudyScreen(
     var correctAnswers by remember { mutableStateOf(0) }
     val currentCard = cards[currentIndex]
 
+
+
     // Rotate transition for flip card
     val rotation by animateFloatAsState(
         targetValue = if (isFlipped) 180f else 0f,
@@ -73,7 +76,7 @@ fun FlashcardStudyScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {}) {
+                    IconButton(onClick = { onNavigate(CreateDeck(deckId)) }) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 },
@@ -278,6 +281,7 @@ fun FlashcardStudyScreen(
             }
         }
     }
+
 }
 
 private fun finishSession(deckId: String, total: Int, correct: Int, onNavigate: (NavKey) -> Unit) {

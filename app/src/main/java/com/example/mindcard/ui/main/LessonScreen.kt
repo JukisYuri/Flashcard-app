@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -40,7 +41,7 @@ fun LessonScreen(
                 title = "No sets available to study",
                 subtitle = "Create a set first to start learning vocabulary.",
                 buttonText = "Create Set",
-                onClick = { onItemClick(CreateDeck) },
+                onClick = { onItemClick(CreateDeck()) },
                 onSeedClick = { Database.seedDemoData() }
             )
         } else {

@@ -9,6 +9,6 @@ import kotlinx.serialization.Serializable
 @Serializable data object Main : NavKey
 @Serializable data class FlashcardStudy(val deckId: String) : NavKey
 @Serializable data class StudyResult(val deckId: String, val accuracy: Int, val xpEarned: Int, val timeMinutes: Int) : NavKey
-@Serializable data object CreateDeck : NavKey
+@Serializable data class CreateDeck(val deckId: String? = null) : NavKey
 @Serializable data object CreateAI : NavKey
 @Serializable data class CreateCard(val deckId: String) : NavKey

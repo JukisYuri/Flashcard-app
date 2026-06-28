@@ -16,12 +16,51 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mindcard.data.Database
 import com.example.mindcard.ui.screens.*
+import java.util.Calendar
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(
+    onLogoutClick: () -> Unit
+) {
     val profile = Database.userProfile.value
     var isEditingName by remember { mutableStateOf(false) }
     var editNameInput by remember { mutableStateOf(profile.name) }
+
+    // Dynamic weekly activity calculation
+    val weekDaysInfo = remember(profile.studyHistory) {
+        val calendar = Calendar.getInstance()
+        val currentDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+        val daysToSubtract = if (currentDayOfWeek == Calendar.SUNDAY) 6 else currentDayOfWeek - Calendar.MONDAY
+        
+        val mondayCal = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, -daysToSubtract)
+        }
+
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val todayStr = dateFormat.format(Calendar.getInstance().time)
+
+        (0..6).map { i ->
+            val dayCal = mondayCal.clone() as Calendar
+            dayCal.add(Calendar.DAY_OF_YEAR, i)
+            val dateStr = dateFormat.format(dayCal.time)
+            val dayLabel = when (dayCal.get(Calendar.DAY_OF_WEEK)) {
+                Calendar.MONDAY -> "M"
+                Calendar.TUESDAY -> "T"
+                Calendar.WEDNESDAY -> "W"
+                Calendar.THURSDAY -> "T"
+                Calendar.FRIDAY -> "F"
+                Calendar.SATURDAY -> "S"
+                Calendar.SUNDAY -> "S"
+                else -> ""
+            }
+            val studied = profile.studyHistory[dateStr] == true
+            val isToday = todayStr == dateStr
+            Triple(dayLabel, studied, isToday)
+        }
+    }
+    val activeDaysCount = remember(weekDaysInfo) { weekDaysInfo.count { it.second } }
 
     Column(
         modifier = Modifier
@@ -73,13 +112,27 @@ fun ProfileScreen() {
                     ProfileStatItem("Streak", "${profile.currentStreak}")
                 }
 
-                Button(
-                    onClick = { isEditingName = true },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("Edit Profile", fontWeight = FontWeight.Bold)
+                    Button(
+                        onClick = { isEditingName = true },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Edit Profile", fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = onLogoutClick,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFDAD6)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Log Out", fontWeight = FontWeight.Bold, color = Color(0xFFBA1A1A))
+                    }
                 }
             }
         }
@@ -93,7 +146,7 @@ fun ProfileScreen() {
                 .padding(16.dp)
         ) {
             Text("Weekly Activity", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
-            Text("Words learned this week", fontSize = 12.sp, color = OutlineColor)
+            Text("Days active this week: $activeDaysCount/7 days", fontSize = 12.sp, color = OutlineColor)
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -104,9 +157,10 @@ fun ProfileScreen() {
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.Bottom
             ) {
-                // Mon to Sun bars (Tue is 45 xp today, other placeholder bars are small)
-                val days = listOf("M" to 10, "T" to 45, "W" to 20, "T" to 30, "F" to 15, "S" to 5, "S" to 25)
-                days.forEach { (name, heightVal) ->
+                weekDaysInfo.forEach { (name, studied, isToday) ->
+                    val barHeight = if (studied) 80.dp else 12.dp
+                    val barColor = if (isToday) PrimaryIndigo else if (studied) PrimaryIndigo.copy(alpha = 0.6f) else Color(0xFFF2F4F6)
+
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Bottom,
@@ -115,12 +169,17 @@ fun ProfileScreen() {
                         Box(
                             modifier = Modifier
                                 .width(16.dp)
-                                .height((heightVal * 1.5).dp)
+                                .height(barHeight)
                                 .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                                .background(if (name == "T") PrimaryIndigo else PrimaryIndigo.copy(alpha = 0.2f))
+                                .background(barColor)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OutlineColor)
+                        Text(
+                            text = name,
+                            fontSize = 11.sp,
+                            fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.Bold,
+                            color = if (isToday) PrimaryIndigo else OutlineColor
+                        )
                     }
                 }
             }

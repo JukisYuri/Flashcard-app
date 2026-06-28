@@ -38,7 +38,18 @@ fun MainNavigation() {
           ForgotPasswordScreen(onNavigate = { navKey -> backStack.add(navKey) })
         }
         entry<Main> {
-          MainScreen(onItemClick = { navKey -> backStack.add(navKey) })
+          MainScreen(
+            onItemClick = { navKey ->
+              if (navKey == Login) {
+                FirebaseAuth.getInstance().signOut()
+                Database.clearPersistence()
+                backStack.clear()
+                backStack.add(Login)
+              } else {
+                backStack.add(navKey)
+              }
+            }
+          )
         }
         entry<FlashcardStudy> { entry ->
           FlashcardStudyScreen(deckId = entry.deckId, onNavigate = { navKey -> backStack.add(navKey) })
@@ -53,8 +64,8 @@ fun MainNavigation() {
               onNavigate = { navKey -> backStack.add(navKey) }
           )
         }
-        entry<CreateDeck> {
-          CreateDeckScreen(onNavigate = { navKey -> backStack.add(navKey) })
+        entry<CreateDeck> { entry ->
+          CreateDeckScreen(deckId = entry.deckId, onNavigate = { navKey -> backStack.add(navKey) })
         }
         entry<CreateAI> {
           CreateAiScreen(onNavigate = { navKey -> backStack.add(navKey) })

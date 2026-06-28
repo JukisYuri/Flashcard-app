@@ -17,7 +17,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
+import com.example.mindcard.CreateAI
 import com.example.mindcard.CreateDeck
+import com.example.mindcard.CreateCard
+import com.example.mindcard.FlashcardStudy
+import com.example.mindcard.Login
 import com.example.mindcard.data.Database
 import com.example.mindcard.ui.screens.*
 
@@ -110,7 +114,7 @@ fun MainScreen(
         floatingActionButton = {
             if (activeTab == ActiveTab.Home || activeTab == ActiveTab.Lesson) {
                 FloatingActionButton(
-                    onClick = { onItemClick(CreateDeck) },
+                    onClick = { onItemClick(CreateDeck()) },
                     containerColor = PrimaryIndigo,
                     contentColor = Color.White,
                     shape = CircleShape
@@ -131,7 +135,7 @@ fun MainScreen(
                 ActiveTab.Lesson -> LessonScreen(decksList, onItemClick)
                 ActiveTab.Library -> LibraryScreen()
                 ActiveTab.Progress -> ProgressScreen()
-                ActiveTab.Profile -> ProfileScreen()
+                ActiveTab.Profile -> ProfileScreen(onLogoutClick = { onItemClick(Login) })
             }
         }
     }

@@ -19,11 +19,39 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mindcard.data.Database
 import com.example.mindcard.ui.screens.*
+import java.util.Calendar
+import java.util.Locale
 
 @Composable
 fun ProgressScreen() {
     val profile = Database.userProfile.value
     var streakRestoreActive by remember { mutableStateOf(true) }
+
+    // Dynamic calendar calculation
+    val calendar = remember { Calendar.getInstance() }
+    val currentYear = remember { calendar.get(Calendar.YEAR) }
+    val currentMonth = remember { calendar.get(Calendar.MONTH) } // 0-indexed
+    val todayDay = remember { calendar.get(Calendar.DAY_OF_MONTH) }
+
+    val monthNames = remember {
+        listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+    }
+    val monthName = monthNames[currentMonth]
+
+    val firstDayCal = remember {
+        Calendar.getInstance().apply {
+            set(Calendar.YEAR, currentYear)
+            set(Calendar.MONTH, currentMonth)
+            set(Calendar.DAY_OF_MONTH, 1)
+        }
+    }
+    // Sunday is 1, Monday is 2, etc. Offset is (Day of Week - 1)
+    val startOffset = remember { firstDayCal.get(Calendar.DAY_OF_WEEK) - 1 }
+    val totalDays = remember { calendar.getActualMaximum(Calendar.DAY_OF_MONTH) }
+
+    val cells = remember {
+        List(startOffset) { null } + (1..totalDays).toList()
+    }
 
     Column(
         modifier = Modifier
@@ -70,7 +98,7 @@ fun ProgressScreen() {
         }
 
         Text(
-            text = "You're on fire!",
+            text = if (profile.currentStreak > 0) "You're on fire!" else "Start learning today!",
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             color = Color(0xFF191C1E)
@@ -97,7 +125,7 @@ fun ProgressScreen() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Study Activity", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
-                Text("June 2026", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
+                Text("$monthName $currentYear", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -119,16 +147,17 @@ fun ProgressScreen() {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Calendar days layout (Simulating 30 days of June 2026 starting on Monday)
-            // Empty start offset: June 2026 starts on Monday. Offset is 1 (Sunday is empty)
-            val totalDays = 30
-            val startOffset = 1
-            val cells = List(startOffset) { null } + (1..totalDays).toList()
-
+            // Calendar days layout
             val chunked = cells.chunked(7)
             chunked.forEach { week ->
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     week.forEach { day ->
+                        val dateStr = if (day != null) {
+                            String.format(Locale.getDefault(), "%04d-%02d-%02d", currentYear, currentMonth + 1, day)
+                        } else ""
+                        val studied = day != null && profile.studyHistory[dateStr] == true
+                        val isToday = day != null && day == todayDay
+
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -137,13 +166,13 @@ fun ProgressScreen() {
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(
                                     if (day == null) Color.Transparent
-                                    else if (day % 4 == 0) SuccessBg.copy(alpha = 0.3f) // studied days
-                                    else if (day == 26) PrimaryIndigo.copy(alpha = 0.2f) // today
+                                    else if (studied) SuccessBg.copy(alpha = 0.3f)
+                                    else if (isToday) PrimaryIndigo.copy(alpha = 0.2f)
                                     else Color(0xFFF2F4F6)
                                 )
                                 .border(
                                     width = 1.dp,
-                                    color = if (day == 26) PrimaryIndigo else Color.Transparent,
+                                    color = if (isToday) PrimaryIndigo else Color.Transparent,
                                     shape = RoundedCornerShape(8.dp)
                                 ),
                             contentAlignment = Alignment.Center
@@ -153,12 +182,12 @@ fun ProgressScreen() {
                                     day.toString(),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (day % 4 == 0) SecondaryGreen else if (day == 26) PrimaryIndigo else Color(0xFF191C1E)
+                                    color = if (studied) SecondaryGreen else if (isToday) PrimaryIndigo else Color(0xFF191C1E)
                                 )
                             }
                         }
                     }
-                    // pad out shorter rows at the end
+                    // Pad out shorter rows at the end
                     if (week.size < 7) {
                         Spacer(modifier = Modifier.weight((7 - week.size).toFloat()))
                     }
@@ -167,7 +196,7 @@ fun ProgressScreen() {
             }
         }
 
-        if (streakRestoreActive) {
+        if (streakRestoreActive && profile.currentStreak == 0) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -179,11 +208,11 @@ fun ProgressScreen() {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     Text("🛡️", fontSize = 24.sp, modifier = Modifier.padding(end = 8.dp))
-                    Text("Streak Shield Active! You missed yesterday.", fontSize = 13.sp, color = OutlineColor)
+                    Text("Streak Shield Active! Keep your streak going.", fontSize = 13.sp, color = OutlineColor)
                 }
                 Button(
                     onClick = {
-                        Database.updateUserProfile(profile.copy(currentStreak = profile.currentStreak + 1))
+                        Database.updateUserProfile(profile.copy(currentStreak = 1))
                         streakRestoreActive = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),

@@ -102,6 +102,16 @@ object Database {
         }
     }
 
+    fun clearPersistence() {
+        profileListener?.remove()
+        decksListener?.remove()
+        profileListener = null
+        decksListener = null
+        currentUserId = null
+        decks.clear()
+        userProfile.value = UserProfile()
+    }
+
     fun addDeck(name: String, category: String, coverUrl: String? = null): Deck {
         val newDeck = Deck(name = name, category = category, coverUrl = coverUrl)
         val userId = currentUserId
@@ -113,11 +123,118 @@ object Database {
         return newDeck
     }
 
+    fun addDeckWithCards(name: String, category: String, cards: List<Card>, coverUrl: String? = null): Deck {
+        val newDeck = Deck(
+            name = name,
+            category = category,
+            cards = cards,
+            coverUrl = coverUrl,
+            masteredPercentage = calculateMastered(cards)
+        )
+        val userId = currentUserId
+        if (userId != null) {
+            db.collection("users").document(userId).collection("decks").document(newDeck.id).set(newDeck)
+        } else {
+            decks.add(newDeck)
+        }
+        return newDeck
+    }
+
+    fun updateDeck(deckId: String, name: String, category: String) {
+        val index = decks.indexOfFirst { it.id == deckId }
+        if (index != -1) {
+            val deck = decks[index]
+            val updatedDeck = deck.copy(name = name, category = category)
+            val userId = currentUserId
+            if (userId != null) {
+                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+            } else {
+                decks[index] = updatedDeck
+            }
+        }
+    }
+
     fun addCardToDeck(deckId: String, card: Card) {
         val index = decks.indexOfFirst { it.id == deckId }
         if (index != -1) {
             val deck = decks[index]
             val updatedCards = deck.cards + card
+            val updatedDeck = deck.copy(
+                cards = updatedCards,
+                masteredPercentage = calculateMastered(updatedCards)
+            )
+            val userId = currentUserId
+            if (userId != null) {
+                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+            } else {
+                decks[index] = updatedDeck
+            }
+        }
+    }
+
+    fun deleteCardFromDeck(deckId: String, cardId: String) {
+        val index = decks.indexOfFirst { it.id == deckId }
+        if (index != -1) {
+            val deck = decks[index]
+            val updatedCards = deck.cards.filter { it.id != cardId }
+            val updatedDeck = deck.copy(
+                cards = updatedCards,
+                masteredPercentage = calculateMastered(updatedCards)
+            )
+            val userId = currentUserId
+            if (userId != null) {
+                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+            } else {
+                decks[index] = updatedDeck
+            }
+        }
+    }
+
+    fun updateCardInDeck(deckId: String, cardId: String, newFront: String, newBack: String) {
+        val index = decks.indexOfFirst { it.id == deckId }
+        if (index != -1) {
+            val deck = decks[index]
+            val updatedCards = deck.cards.map { card ->
+                if (card.id == cardId) card.copy(englishWord = newFront, definition = newBack) else card
+            }
+            val updatedDeck = deck.copy(
+                cards = updatedCards,
+                masteredPercentage = calculateMastered(updatedCards)
+            )
+            val userId = currentUserId
+            if (userId != null) {
+                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+            } else {
+                decks[index] = updatedDeck
+            }
+        }
+    }
+
+    fun updateCardInDeckFull(
+        deckId: String,
+        cardId: String,
+        englishWord: String,
+        pronunciation: String,
+        pos: String,
+        definition: String,
+        exampleSentence: String,
+        synonyms: String
+    ) {
+        val index = decks.indexOfFirst { it.id == deckId }
+        if (index != -1) {
+            val deck = decks[index]
+            val updatedCards = deck.cards.map { card ->
+                if (card.id == cardId) {
+                    card.copy(
+                        englishWord = englishWord,
+                        pronunciation = pronunciation,
+                        pos = pos,
+                        definition = definition,
+                        exampleSentence = exampleSentence,
+                        synonyms = synonyms
+                    )
+                } else card
+            }
             val updatedDeck = deck.copy(
                 cards = updatedCards,
                 masteredPercentage = calculateMastered(updatedCards)
