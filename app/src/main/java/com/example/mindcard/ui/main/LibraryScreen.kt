@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mindcard.data.Card
+import com.example.mindcard.data.Database
 import com.example.mindcard.ui.viewmodel.LibraryViewModel
 
 @Composable
@@ -35,7 +38,19 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = viewModel()
 ) {
     val totalCount = viewModel.getAllCardsCount()
-    val filteredCards = viewModel.getFilteredCards()
+    val favVersion = viewModel.favoriteVersion
+    val allCards = remember(favVersion) { viewModel.decks.flatMap { it.cards } }
+    val filteredCards = remember(allCards, viewModel.searchQuery, viewModel.selectedLetter) {
+        allCards.filter { card ->
+            val matchesQuery = card.englishWord.contains(viewModel.searchQuery, ignoreCase = true) ||
+                    card.definition.contains(viewModel.searchQuery, ignoreCase = true)
+            val matchesLetter = viewModel.selectedLetter == null ||
+                    card.englishWord.startsWith(viewModel.selectedLetter.toString(), ignoreCase = true)
+            matchesQuery && matchesLetter
+        }
+    }
+    var showFavoritesOnly by remember { mutableStateOf(false) }
+    val displayCards = if (showFavoritesOnly) filteredCards.filter { it.isFavorite } else filteredCards
 
     Column(
         modifier = modifier
@@ -61,6 +76,31 @@ fun LibraryScreen(
                 focusedContainerColor = MaterialTheme.colorScheme.surface
             )
         )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = !showFavoritesOnly,
+                onClick = { showFavoritesOnly = false },
+                label = { Text("All ($totalCount)") },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = PrimaryIndigo,
+                    selectedLabelColor = Color.White
+                )
+            )
+            val favCount = viewModel.getFavoriteCount()
+            FilterChip(
+                selected = showFavoritesOnly,
+                onClick = { showFavoritesOnly = true },
+                label = { Text("★ Favorites ($favCount)") },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Color(0xFFFF6B6B),
+                    selectedLabelColor = Color.White
+                )
+            )
+        }
 
         val letters = ('A'..'Z').toList()
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -94,10 +134,12 @@ fun LibraryScreen(
             }
         }
 
-        if (filteredCards.isEmpty()) {
+        if (displayCards.isEmpty()) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text(
-                    text = if (totalCount == 0) "No words in your library yet.\nStart learning a deck to add words!" else "No search results matches.",
+                    text = if (showFavoritesOnly) "No favorite words yet.\nTap ★ on a word to add it to favorites."
+                             else if (totalCount == 0) "No words in your library yet.\nStart learning a deck to add words!"
+                             else "No search results matches.",
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 15.sp
@@ -110,8 +152,11 @@ fun LibraryScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                items(filteredCards) { card ->
-                    LibraryWordCard(card = card)
+                items(displayCards, key = { it.id }) { card ->
+                    LibraryWordCard(card = card, onToggleFavorite = {
+                        val deck = viewModel.decks.find { deck -> deck.cards.any { it.id == card.id } }
+                        if (deck != null) viewModel.toggleFavorite(deck.id, card.id)
+                    })
                 }
             }
         }
@@ -119,7 +164,7 @@ fun LibraryScreen(
 }
 
 @Composable
-fun LibraryWordCard(card: Card) {
+fun LibraryWordCard(card: Card, onToggleFavorite: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
@@ -127,12 +172,31 @@ fun LibraryWordCard(card: Card) {
             .padding(16.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier
-                    .background(PrimaryIndigo.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(card.pos, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
+                Box(
+                    modifier = Modifier
+                        .background(PrimaryIndigo.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(card.pos, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
+                }
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clickable(onClick = onToggleFavorite),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (card.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = "Toggle favorite",
+                        tint = if (card.isFavorite) Color(0xFFFF6B6B) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
             Text(card.englishWord, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Text(card.pronunciation, fontSize = 12.sp, fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)

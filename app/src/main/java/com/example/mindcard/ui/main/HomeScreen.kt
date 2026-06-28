@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -101,6 +102,56 @@ fun HomeScreen(
                 progressColor = DarkGreen,
                 isTimer = true
             )
+        }
+
+        // Word of the Day
+        val allCards = decks.flatMap { it.cards }
+        val wordOfTheDay = if (allCards.isNotEmpty()) allCards.random() else null
+        if (wordOfTheDay != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = PrimaryIndigo.copy(alpha = 0.1f)),
+                border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("✨", fontSize = 18.sp)
+                        Text("Word of the Day", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
+                    }
+                    Text(
+                        text = wordOfTheDay.englishWord,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = wordOfTheDay.pronunciation,
+                        fontSize = 14.sp,
+                        fontStyle = FontStyle.Italic,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = wordOfTheDay.definition,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (wordOfTheDay.exampleSentence.isNotEmpty()) {
+                        Text(
+                            text = "\"${wordOfTheDay.exampleSentence}\"",
+                            fontSize = 13.sp,
+                            fontStyle = FontStyle.Italic,
+                            color = PrimaryIndigo.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+            }
         }
 
         Row(

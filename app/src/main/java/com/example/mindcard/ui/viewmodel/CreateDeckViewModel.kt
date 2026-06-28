@@ -13,6 +13,7 @@ class CreateDeckViewModel : ViewModel() {
 
     var name by mutableStateOf("")
     var category by mutableStateOf("Languages")
+    var tags by mutableStateOf("")
     var showCategoryMenu by mutableStateOf(false)
     var showDeleteConfirm by mutableStateOf(false)
 
@@ -33,15 +34,19 @@ class CreateDeckViewModel : ViewModel() {
         if (deck != null) {
             name = deck.name
             category = deck.category
+            tags = deck.tags.joinToString(", ")
         }
     }
 
     fun saveDeck(existingDeckId: String?, onSuccess: () -> Unit) {
         if (name.isNotBlank()) {
+            val tagList = tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             if (existingDeckId != null) {
                 deckRepository.updateDeck(existingDeckId, name.trim(), category)
+                deckRepository.updateDeckTags(existingDeckId, tagList)
             } else {
-                deckRepository.addDeck(name.trim(), category)
+                val deck = deckRepository.addDeck(name.trim(), category)
+                deckRepository.updateDeckTags(deck.id, tagList)
             }
             onSuccess()
         }

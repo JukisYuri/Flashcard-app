@@ -66,6 +66,10 @@ class DeckRepository {
         Database.updateDeckMastery(deckId, mastery)
     }
 
+    fun updateDeckTags(deckId: String, tags: List<String>) {
+        Database.updateDeckTags(deckId, tags)
+    }
+
     fun seedDemoData() {
         Database.seedDemoData()
     }

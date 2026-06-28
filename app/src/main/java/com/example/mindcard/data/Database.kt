@@ -25,6 +25,7 @@ data class Card(
     val definition: String = "",
     val exampleSentence: String = "",
     val synonyms: String = "",
+    val isFavorite: Boolean = false,
     // Spaced Repetition fields
     val easeFactor: Double = FsrsDefaults.DEFAULT_EASE_FACTOR,
     val interval: Double = FsrsDefaults.DEFAULT_INTERVAL,
@@ -62,7 +63,8 @@ data class Deck(
     val category: String = "",
     val coverUrl: String? = null,
     val cards: List<Card> = emptyList(),
-    val masteredPercentage: Int = 0
+    val masteredPercentage: Int = 0,
+    val tags: List<String> = emptyList()
 )
 
 data class UserProfile(
@@ -84,6 +86,7 @@ object Database {
     var currentSessionAccuracy = 0
     var currentSessionXp = 0
     var currentSessionTime = 0
+    private var skipNextDeckListener = false
 
     private val db by lazy { FirebaseFirestore.getInstance() }
     private var profileListener: ListenerRegistration? = null
@@ -180,8 +183,11 @@ object Database {
         val decksRef = db.collection("users").document(userId).collection("decks")
         decksListener = decksRef.addSnapshotListener { snapshot, error ->
             if (error != null) {
-                // Fallback to local database
                 loadFromLocalDatabase(userId)
+                return@addSnapshotListener
+            }
+            if (skipNextDeckListener) {
+                skipNextDeckListener = false
                 return@addSnapshotListener
             }
             if (snapshot != null) {
@@ -190,8 +196,6 @@ object Database {
                 }
                 decks.clear()
                 decks.addAll(fetchedDecks)
-
-                // Save to local database
                 saveDecksToLocal(fetchedDecks)
             }
         }
@@ -531,12 +535,53 @@ object Database {
                 if (card.id == updatedCard.id) updatedCard else card
             }
             val updatedDeck = deck.copy(cards = updatedCards)
+            // Always update local state first for immediate UI feedback
+            decks[index] = updatedDeck
+            // Then sync to Firestore if online
+            val userId = currentUserId
+            if (userId != null && !useOfflineMode) {
+                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+            }
+        }
+    }
+
+    fun toggleFavorite(deckId: String, cardId: String) {
+        val index = decks.indexOfFirst { it.id == deckId }
+        if (index != -1) {
+            val deck = decks[index]
+            val card = deck.cards.find { it.id == cardId } ?: return
+            val updatedCard = card.copy(isFavorite = !card.isFavorite)
+            val updatedCards = deck.cards.map { if (it.id == cardId) updatedCard else it }
+            val updatedDeck = deck.copy(cards = updatedCards)
+            decks[index] = updatedDeck
+            // Keep skip flag until next Firestore sync cycle completes
+            skipNextDeckListener = true
+        }
+    }
+
+    fun syncFavoritesToFirestore() {
+        val userId = currentUserId ?: return
+        skipNextDeckListener = false
+        for (deck in decks) {
+            db.collection("users").document(userId).collection("decks").document(deck.id).set(deck)
+        }
+    }
+
+    fun getAllFavoriteCards(): List<Card> {
+        return decks.flatMap { deck -> deck.cards.filter { it.isFavorite } }
+    }
+
+    fun updateDeckTags(deckId: String, tags: List<String>) {
+        val index = decks.indexOfFirst { it.id == deckId }
+        if (index != -1) {
+            val deck = decks[index]
+            val updatedDeck = deck.copy(tags = tags)
             val userId = currentUserId
             if (userId != null) {
                 if (useOfflineMode) {
                     val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
                     scope.launch {
-                        syncManager?.updateCard(CardEntity.fromCard(updatedCard, deckId))
+                        syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
                     }
                 } else {
                     db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)

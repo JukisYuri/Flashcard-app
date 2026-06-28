@@ -3,23 +3,20 @@ package com.example.mindcard.ui.viewmodel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.ViewModel
 import com.example.mindcard.data.Card
+import com.example.mindcard.data.Database
 import com.example.mindcard.data.Deck
-import com.example.mindcard.data.repository.DeckRepository
 
 class LibraryViewModel : ViewModel() {
-    private val deckRepository = DeckRepository()
-
-    val decks: SnapshotStateList<Deck> = deckRepository.decks
-
+    val decks get() = Database.decks
     var searchQuery by mutableStateOf("")
     var selectedLetter by mutableStateOf<Char?>(null)
+    var favoriteVersion by mutableStateOf(0)
 
-    fun getAllCardsCount(): Int {
-        return decks.sumOf { it.cards.size }
-    }
+    fun getAllCardsCount(): Int = decks.sumOf { it.cards.size }
+
+    fun getFavoriteCount(): Int = decks.sumOf { deck -> deck.cards.count { it.isFavorite } }
 
     fun getFilteredCards(): List<Card> {
         val allCards = decks.flatMap { it.cards }
@@ -30,5 +27,10 @@ class LibraryViewModel : ViewModel() {
                     card.englishWord.startsWith(selectedLetter.toString(), ignoreCase = true)
             matchesQuery && matchesLetter
         }
+    }
+
+    fun toggleFavorite(deckId: String, cardId: String) {
+        Database.toggleFavorite(deckId, cardId)
+        favoriteVersion++
     }
 }

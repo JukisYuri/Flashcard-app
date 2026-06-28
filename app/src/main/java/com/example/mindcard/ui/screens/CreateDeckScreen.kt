@@ -153,6 +153,16 @@ fun CreateDeckScreen(
                         }
                     }
                 }
+
+                // Tags input
+                OutlinedTextField(
+                    value = viewModel.tags,
+                    onValueChange = { viewModel.tags = it },
+                    label = { Text("Tags (comma separated)") },
+                    placeholder = { Text("e.g. important, review, beginner") },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             // Cards in this Deck list (Only visible in Edit mode)
