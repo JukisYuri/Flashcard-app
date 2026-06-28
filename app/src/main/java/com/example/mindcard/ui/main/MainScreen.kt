@@ -2,6 +2,7 @@ package com.example.mindcard.ui.main
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +41,8 @@ fun MainScreen(
     var activeTab by remember { mutableStateOf(ActiveTab.Home) }
     val profile by viewModel.userProfile
     val decksList = viewModel.decks
+    var showSyncDialog by remember { mutableStateOf(false) }
+    val isOnline = remember { mutableStateOf(Database.isOnline()) }
 
     Scaffold(
         topBar = {
@@ -66,6 +69,40 @@ fun MainScreen(
                     }
                 },
                 actions = {
+                    // Online/Offline indicator
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(if (isOnline.value) Color(0xFF2ECC71).copy(alpha = 0.2f) else Color(0xFFFF6B6B).copy(alpha = 0.2f))
+                            .border(1.dp, if (isOnline.value) Color(0xFF2ECC71) else Color(0xFFFF6B6B), CircleShape)
+                            .clickable { showSyncDialog = true }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(
+                                        if (isOnline.value) Color(0xFF2ECC71) else Color(0xFFFF6B6B),
+                                        CircleShape
+                                    )
+                            )
+                            Text(
+                                text = if (isOnline.value) "Online" else "Offline",
+                                fontWeight = FontWeight.Bold,
+                                color = if (isOnline.value) Color(0xFF2ECC71) else Color(0xFFFF6B6B),
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Streak badge
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
@@ -142,5 +179,112 @@ fun MainScreen(
                 ActiveTab.Profile -> ProfileScreen(onLogoutClick = { onItemClick(Login) })
             }
         }
+    }
+
+    // Sync Dialog
+    if (showSyncDialog) {
+        AlertDialog(
+            onDismissRequest = { showSyncDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Sync,
+                        contentDescription = null,
+                        tint = PrimaryIndigo
+                    )
+                    Text("Sync & Offline", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Connection status
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Trạng thái:", fontWeight = FontWeight.Bold)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .background(
+                                        if (isOnline.value) Color(0xFF2ECC71) else Color(0xFFFF6B6B),
+                                        CircleShape
+                                    )
+                            )
+                            Text(
+                                if (isOnline.value) "Đang kết nối" else "Offline",
+                                color = if (isOnline.value) Color(0xFF2ECC71) else Color(0xFFFF6B6B),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    HorizontalDivider()
+
+                    // Sync action
+                    Text(
+                        "Nhấn Sync để đồng bộ dữ liệu giữa thiết bị và đám mây.",
+                        fontSize = 13.sp,
+                        color = OutlineColor
+                    )
+
+                    // Offline mode toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Chế độ Offline", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Bắt buộc dùng dữ liệu cục bộ", fontSize = 12.sp, color = OutlineColor)
+                        }
+                        Switch(
+                            checked = !isOnline.value,
+                            onCheckedChange = { offline ->
+                                if (offline) {
+                                    Database.forceOfflineMode()
+                                } else {
+                                    Database.forceOnlineMode()
+                                }
+                                isOnline.value = Database.isOnline()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color(0xFFFF6B6B),
+                                checkedTrackColor = Color(0xFFFF6B6B).copy(alpha = 0.3f)
+                            )
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        Database.syncNow()
+                        isOnline.value = Database.isOnline()
+                        showSyncDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo)
+                ) {
+                    Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Sync Now")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSyncDialog = false }) {
+                    Text("Đóng")
+                }
+            }
+        )
     }
 }

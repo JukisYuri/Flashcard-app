@@ -5,6 +5,7 @@ plugins {
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
   alias(libs.plugins.google.services)
+  alias(libs.plugins.ksp)
 }
 
 android {
@@ -107,4 +108,9 @@ dependencies {
   implementation(libs.firebase.firestore)
   implementation(libs.google.generativeai)
   implementation(libs.kotlinx.serialization.json)
+
+  // Room Database
+  implementation(libs.room.runtime)
+  implementation(libs.room.ktx)
+  ksp(libs.room.compiler)
 }
