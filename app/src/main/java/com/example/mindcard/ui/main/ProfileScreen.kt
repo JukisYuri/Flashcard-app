@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.mindcard.Settings
 import com.example.mindcard.ui.screens.*
 import com.example.mindcard.ui.viewmodel.ProfileViewModel
 import java.text.SimpleDateFormat
@@ -24,6 +27,7 @@ import java.util.Locale
 @Composable
 fun ProfileScreen(
     onLogoutClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = viewModel()
 ) {
@@ -124,6 +128,18 @@ fun ProfileScreen(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Edit Profile", fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = onSettingsClick,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryIndigo),
+                        border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Settings", fontWeight = FontWeight.Bold)
                     }
 
                     Button(

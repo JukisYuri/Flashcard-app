@@ -71,6 +71,9 @@ fun MainNavigation() {
         entry<CreateCard> { entry ->
           CreateCardScreen(deckId = entry.deckId, onNavigate = { navKey -> backStack.add(navKey) })
         }
+        entry<Settings> {
+          SettingsScreen(onNavigate = { navKey -> backStack.add(navKey) })
+        }
       },
   )
 }

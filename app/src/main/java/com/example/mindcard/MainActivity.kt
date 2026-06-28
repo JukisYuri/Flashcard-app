@@ -9,6 +9,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.example.mindcard.data.Database
+import com.example.mindcard.notification.NotificationHelper
+import com.example.mindcard.notification.ReminderWorker
 import com.example.mindcard.theme.MindCardTheme
 
 class MainActivity : ComponentActivity() {
@@ -17,6 +19,10 @@ class MainActivity : ComponentActivity() {
 
     // Initialize Room Database and SyncManager
     Database.initialize(applicationContext)
+
+    // Initialize Notifications
+    NotificationHelper.createNotificationChannel(this)
+    ReminderWorker.reschedule(this)
 
     enableEdgeToEdge()
     setContent {

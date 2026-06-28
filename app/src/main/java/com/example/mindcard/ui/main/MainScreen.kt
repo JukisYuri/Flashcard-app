@@ -23,6 +23,7 @@ import com.example.mindcard.CreateDeck
 import com.example.mindcard.CreateCard
 import com.example.mindcard.FlashcardStudy
 import com.example.mindcard.Login
+import com.example.mindcard.Settings
 import com.example.mindcard.data.Database
 import com.example.mindcard.ui.screens.*
 
@@ -176,7 +177,10 @@ fun MainScreen(
                 ActiveTab.Lesson -> LessonScreen(onItemClick = onItemClick, viewModel = viewModel)
                 ActiveTab.Library -> LibraryScreen()
                 ActiveTab.Progress -> ProgressScreen()
-                ActiveTab.Profile -> ProfileScreen(onLogoutClick = { onItemClick(Login) })
+                ActiveTab.Profile -> ProfileScreen(
+                    onLogoutClick = { onItemClick(Login) },
+                    onSettingsClick = { onItemClick(Settings) }
+                )
             }
         }
     }
