@@ -62,6 +62,7 @@ fun FlashcardStudyScreen(
     }
 
     val cards = currentDeck.cards
+    val dueCardsCount = viewModel.getDueCardsCount()
     val currentCard = cards[viewModel.currentCardIndex]
 
     // Rotate transition for flip card
@@ -115,6 +116,14 @@ fun FlashcardStudyScreen(
                         fontWeight = FontWeight.Bold,
                         color = OutlineColor
                     )
+                    if (dueCardsCount > 0) {
+                        Text(
+                            text = "$dueCardsCount DUE",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFF6B6B)
+                        )
+                    }
                 }
             }
 

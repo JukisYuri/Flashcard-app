@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
@@ -21,6 +22,7 @@ import com.example.mindcard.CreateDeck
 import com.example.mindcard.FlashcardStudy
 import com.example.mindcard.data.Database
 import com.example.mindcard.data.Deck
+import com.example.mindcard.data.FsrsAlgorithm
 import com.example.mindcard.ui.screens.*
 
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -90,7 +92,13 @@ fun LessonScreen(
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(deck.name, fontSize = 16.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = Color(0xFF191C1E))
-                                Text("${deck.cards.size} Cards", fontSize = 12.sp, color = OutlineColor)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("${deck.cards.size} Cards", fontSize = 12.sp, color = OutlineColor)
+                                    val dueCount = FsrsAlgorithm.getDueCardsCount(deck.cards)
+                                    if (dueCount > 0) {
+                                        Text("$dueCount due", fontSize = 12.sp, color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold)
+                                    }
+                                }
                             }
                             if (deck.cards.isEmpty()) {
                                 Text("Add Cards", color = PrimaryIndigo, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 13.sp)

@@ -17,8 +17,37 @@ data class Card(
     val pos: String = "", // Noun, Verb, Adj
     val definition: String = "",
     val exampleSentence: String = "",
-    val synonyms: String = ""
-)
+    val synonyms: String = "",
+    // Spaced Repetition fields
+    val easeFactor: Double = FsrsDefaults.DEFAULT_EASE_FACTOR,
+    val interval: Double = FsrsDefaults.DEFAULT_INTERVAL,
+    val repetitions: Int = FsrsDefaults.DEFAULT_REPETITIONS,
+    val nextReview: Long = System.currentTimeMillis(),
+    val lastReview: Long = 0L,
+    val reviewState: String = ReviewState.New.name
+) {
+    fun toCardState(): CardState {
+        return CardState(
+            easeFactor = easeFactor,
+            interval = interval,
+            repetitions = repetitions,
+            nextReview = nextReview,
+            lastReview = lastReview,
+            state = ReviewState.entries.find { it.name == reviewState } ?: ReviewState.New
+        )
+    }
+
+    fun updateFromCardState(newstate: CardState): Card {
+        return this.copy(
+            easeFactor = newstate.easeFactor,
+            interval = newstate.interval,
+            repetitions = newstate.repetitions,
+            nextReview = newstate.nextReview,
+            lastReview = newstate.lastReview,
+            reviewState = newstate.state.name
+        )
+    }
+}
 
 data class Deck(
     val id: String = UUID.randomUUID().toString(),
@@ -266,6 +295,37 @@ object Database {
         }
     }
 
+    fun updateCardState(deckId: String, updatedCard: Card) {
+        val index = decks.indexOfFirst { it.id == deckId }
+        if (index != -1) {
+            val deck = decks[index]
+            val updatedCards = deck.cards.map { card ->
+                if (card.id == updatedCard.id) updatedCard else card
+            }
+            val updatedDeck = deck.copy(cards = updatedCards)
+            val userId = currentUserId
+            if (userId != null) {
+                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+            } else {
+                decks[index] = updatedDeck
+            }
+        }
+    }
+
+    fun updateDeckMastery(deckId: String, mastery: Int) {
+        val index = decks.indexOfFirst { it.id == deckId }
+        if (index != -1) {
+            val deck = decks[index]
+            val updatedDeck = deck.copy(masteredPercentage = mastery)
+            val userId = currentUserId
+            if (userId != null) {
+                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+            } else {
+                decks[index] = updatedDeck
+            }
+        }
+    }
+
     fun updateProfileName(newName: String) {
         updateUserProfile(userProfile.value.copy(name = newName))
     }
@@ -332,6 +392,9 @@ object Database {
             decks.clear()
         }
 
+        val now = System.currentTimeMillis()
+        val oneDayMs = 24 * 60 * 60 * 1000L
+
         val basicSet = addDeck("Basic Greetings", "Languages", null)
         addCardToDeck(basicSet.id, Card(
             englishWord = "Hello",
@@ -339,7 +402,13 @@ object Database {
             pos = "Noun",
             definition = "Used as a greeting or to begin a telephone conversation.",
             exampleSentence = "Hello, is anyone there?",
-            synonyms = "Hi, Greetings"
+            synonyms = "Hi, Greetings",
+            easeFactor = 2.5,
+            interval = 1.0,
+            repetitions = 1,
+            nextReview = now - oneDayMs, // Due yesterday (for demo)
+            lastReview = now - 2 * oneDayMs,
+            reviewState = ReviewState.Review.name
         ))
         addCardToDeck(basicSet.id, Card(
             englishWord = "Serendipity",
@@ -347,7 +416,13 @@ object Database {
             pos = "Noun",
             definition = "The occurrence and development of events by chance in a happy or beneficial way.",
             exampleSentence = "A fortunate stroke of serendipity.",
-            synonyms = "Coincidence, Luck"
+            synonyms = "Coincidence, Luck",
+            easeFactor = 2.5,
+            interval = 6.0,
+            repetitions = 2,
+            nextReview = now + 3 * oneDayMs, // Due in 3 days
+            lastReview = now - 3 * oneDayMs,
+            reviewState = ReviewState.Review.name
         ))
 
         val foodSet = addDeck("Food & Dining", "Languages", null)
@@ -357,7 +432,13 @@ object Database {
             pos = "Adj",
             definition = "Highly pleasant to the taste.",
             exampleSentence = "The food was delicious.",
-            synonyms = "Tasty, Yummy"
+            synonyms = "Tasty, Yummy",
+            easeFactor = 2.5,
+            interval = 0.0,
+            repetitions = 0,
+            nextReview = now, // Due now
+            lastReview = 0L,
+            reviewState = ReviewState.New.name
         ))
     }
 }

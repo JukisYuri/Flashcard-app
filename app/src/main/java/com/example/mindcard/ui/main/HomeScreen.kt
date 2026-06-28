@@ -23,6 +23,7 @@ import com.example.mindcard.CreateCard
 import com.example.mindcard.CreateDeck
 import com.example.mindcard.FlashcardStudy
 import com.example.mindcard.data.Deck
+import com.example.mindcard.data.FsrsAlgorithm
 import com.example.mindcard.ui.screens.*
 
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -45,6 +46,7 @@ fun HomeScreen(
     val scrollState = rememberScrollState()
     val userProfile by viewModel.userProfile
     val decks = viewModel.decks
+    val totalDueCards = viewModel.getTotalDueCards()
 
     Column(
         modifier = modifier
@@ -66,6 +68,16 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Due Cards goal card
+            GoalCardCircular(
+                title = "DUE CARDS",
+                value = "$totalDueCards",
+                goal = "cards",
+                progress = if (totalDueCards > 0) minOf(1f, totalDueCards.toFloat() / 20) else 0f,
+                progressColor = Color(0xFFFF6B6B),
+                isTimer = false
+            )
+
             // Words learned goal card
             val wordsLearned = userProfile.totalWordsLearned
             val wordsGoal = 30
@@ -306,11 +318,31 @@ fun DeckCardVertical(
                     fontWeight = FontWeight.Medium,
                     color = Color(0xFF191C1E)
                 )
-                Text(
-                    text = "${deck.cards.size} Cards total",
-                    fontSize = 15.sp,
-                    color = OutlineColor
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${deck.cards.size} Cards total",
+                        fontSize = 15.sp,
+                        color = OutlineColor
+                    )
+                    val dueCount = FsrsAlgorithm.getDueCardsCount(deck.cards)
+                    if (dueCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0xFFFF6B6B).copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "$dueCount due",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFF6B6B)
+                            )
+                        }
+                    }
+                }
             }
 
             // Bottom Progress Bar
