@@ -2,6 +2,9 @@ package com.example.mindcard.data
 
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -9,18 +12,18 @@ import java.util.UUID
 
 data class Card(
     val id: String = UUID.randomUUID().toString(),
-    val englishWord: String,
-    val pronunciation: String,
-    val pos: String, // Noun, Verb, Adj
-    val definition: String,
-    val exampleSentence: String,
+    val englishWord: String = "",
+    val pronunciation: String = "",
+    val pos: String = "", // Noun, Verb, Adj
+    val definition: String = "",
+    val exampleSentence: String = "",
     val synonyms: String = ""
 )
 
 data class Deck(
     val id: String = UUID.randomUUID().toString(),
-    val name: String,
-    val category: String,
+    val name: String = "",
+    val category: String = "",
     val coverUrl: String? = null,
     val cards: List<Card> = emptyList(),
     val masteredPercentage: Int = 0
@@ -46,13 +49,67 @@ object Database {
     var currentSessionXp = 0
     var currentSessionTime = 0
 
+    private val db = FirebaseFirestore.getInstance()
+    private var profileListener: ListenerRegistration? = null
+    private var decksListener: ListenerRegistration? = null
+    private var currentUserId: String? = null
+
     init {
-        // Starts completely blank. No pre-loaded decks or cards.
+        // Starts completely blank.
+    }
+
+    fun initializeUserPersistence(userId: String) {
+        if (currentUserId == userId) return // Already initialized for this user
+
+        // Clean up previous listeners
+        profileListener?.remove()
+        decksListener?.remove()
+
+        currentUserId = userId
+
+        // Listen to profile
+        val profileRef = db.collection("users").document(userId)
+        profileListener = profileRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                return@addSnapshotListener
+            }
+            if (snapshot != null && snapshot.exists()) {
+                val profile = snapshot.toObject(UserProfile::class.java)
+                if (profile != null) {
+                    userProfile.value = profile
+                }
+            } else {
+                // If profile doesn't exist, create it
+                val displayName = FirebaseAuth.getInstance().currentUser?.displayName ?: "Learner"
+                val initialProfile = UserProfile(name = displayName)
+                profileRef.set(initialProfile)
+            }
+        }
+
+        // Listen to decks
+        val decksRef = db.collection("users").document(userId).collection("decks")
+        decksListener = decksRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                return@addSnapshotListener
+            }
+            if (snapshot != null) {
+                val fetchedDecks = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(Deck::class.java)?.copy(id = doc.id)
+                }
+                decks.clear()
+                decks.addAll(fetchedDecks)
+            }
+        }
     }
 
     fun addDeck(name: String, category: String, coverUrl: String? = null): Deck {
         val newDeck = Deck(name = name, category = category, coverUrl = coverUrl)
-        decks.add(newDeck)
+        val userId = currentUserId
+        if (userId != null) {
+            db.collection("users").document(userId).collection("decks").document(newDeck.id).set(newDeck)
+        } else {
+            decks.add(newDeck)
+        }
         return newDeck
     }
 
@@ -61,19 +118,39 @@ object Database {
         if (index != -1) {
             val deck = decks[index]
             val updatedCards = deck.cards + card
-            decks[index] = deck.copy(
+            val updatedDeck = deck.copy(
                 cards = updatedCards,
                 masteredPercentage = calculateMastered(updatedCards)
             )
+            val userId = currentUserId
+            if (userId != null) {
+                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+            } else {
+                decks[index] = updatedDeck
+            }
         }
     }
 
     fun deleteDeck(deckId: String) {
-        decks.removeAll { it.id == deckId }
+        val userId = currentUserId
+        if (userId != null) {
+            db.collection("users").document(userId).collection("decks").document(deckId).delete()
+        } else {
+            decks.removeAll { it.id == deckId }
+        }
+    }
+
+    fun updateUserProfile(profile: UserProfile) {
+        val userId = currentUserId
+        if (userId != null) {
+            db.collection("users").document(userId).set(profile)
+        } else {
+            userProfile.value = profile
+        }
     }
 
     fun updateProfileName(newName: String) {
-        userProfile.value = userProfile.value.copy(name = newName)
+        updateUserProfile(userProfile.value.copy(name = newName))
     }
 
     fun recordStudySession(deckId: String, accuracy: Int, xp: Int, timeMin: Int) {
@@ -83,12 +160,11 @@ object Database {
 
         // Update profile
         val profile = userProfile.value
-        val todayStr = SimpleDateFormat("yyyy-MM-DD", Locale.getDefault()).format(Date())
+        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val updatedHistory = profile.studyHistory.toMutableMap()
         updatedHistory[todayStr] = true
 
         // Calculate new streak
-        val hasLearnedToday = true
         var newStreak = profile.currentStreak
         if (profile.studyHistory[todayStr] != true) {
             newStreak += 1
@@ -99,7 +175,7 @@ object Database {
         // Count unique words in all decks
         val uniqueWords = decks.flatMap { it.cards }.map { it.englishWord.lowercase() }.distinct().size
 
-        userProfile.value = profile.copy(
+        val updatedProfile = profile.copy(
             totalXp = profile.totalXp + xp,
             currentStreak = newStreak,
             bestStreak = bestStreak,
@@ -107,23 +183,38 @@ object Database {
             studyHistory = updatedHistory
         )
 
+        updateUserProfile(updatedProfile)
+
         // Update deck mastery progress slightly
         val deckIndex = decks.indexOfFirst { it.id == deckId }
         if (deckIndex != -1) {
             val deck = decks[deckIndex]
             val newMastery = minOf(100, deck.masteredPercentage + (accuracy / 10))
-            decks[deckIndex] = deck.copy(masteredPercentage = newMastery)
+            val updatedDeck = deck.copy(masteredPercentage = newMastery)
+            val userId = currentUserId
+            if (userId != null) {
+                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+            } else {
+                decks[deckIndex] = updatedDeck
+            }
         }
     }
 
     private fun calculateMastered(cards: List<Card>): Int {
-        // Base mastery calculation for placeholder purposes
         return if (cards.isEmpty()) 0 else 10 // Starts at 10% when cards are added
     }
 
     fun seedDemoData() {
-        // Option to seed some clean dynamic data for demonstration testing
-        decks.clear()
+        val userId = currentUserId
+        if (userId != null) {
+            // Delete all current decks in Firestore first to reset
+            decks.forEach { deck ->
+                db.collection("users").document(userId).collection("decks").document(deck.id).delete()
+            }
+        } else {
+            decks.clear()
+        }
+
         val basicSet = addDeck("Basic Greetings", "Languages", null)
         addCardToDeck(basicSet.id, Card(
             englishWord = "Hello",

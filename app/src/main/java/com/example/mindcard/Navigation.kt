@@ -7,9 +7,21 @@ import androidx.navigation3.ui.NavDisplay
 import com.example.mindcard.ui.main.MainScreen
 import com.example.mindcard.ui.screens.*
 
+import androidx.compose.runtime.remember
+import com.google.firebase.auth.FirebaseAuth
+import com.example.mindcard.data.Database
+
 @Composable
 fun MainNavigation() {
-  val backStack = rememberNavBackStack(Login)
+  val auth = remember { FirebaseAuth.getInstance() }
+  val currentUser = remember { auth.currentUser }
+  val initialScreen = if (currentUser != null) {
+      Database.initializeUserPersistence(currentUser.uid)
+      Main
+  } else {
+      Login
+  }
+  val backStack = rememberNavBackStack(initialScreen)
 
   NavDisplay(
     backStack = backStack,
