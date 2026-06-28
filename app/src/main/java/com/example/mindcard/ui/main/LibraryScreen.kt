@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mindcard.data.Card
-import com.example.mindcard.ui.screens.*
 import com.example.mindcard.ui.viewmodel.LibraryViewModel
 
 @Composable
@@ -41,13 +40,13 @@ fun LibraryScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("My Library", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
-        Text("Review all $totalCount words you've learned so far.", fontSize = 14.sp, color = OutlineColor)
+        Text("My Library", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+        Text("Review all $totalCount words you've learned so far.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-        // Search Bar
         OutlinedTextField(
             value = viewModel.searchQuery,
             onValueChange = { viewModel.searchQuery = it },
@@ -56,30 +55,24 @@ fun LibraryScreen(
             shape = RoundedCornerShape(24.dp),
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-                unfocusedBorderColor = OutlineVariantColor.copy(alpha = 0.5f),
-                focusedBorderColor = PrimaryIndigo
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                focusedBorderColor = PrimaryIndigo,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedContainerColor = MaterialTheme.colorScheme.surface
             )
         )
 
-        // Alphabet quick filter list
         val letters = ('A'..'Z').toList()
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             item {
                 Box(
                     modifier = Modifier
                         .clip(CircleShape)
-                        .background(if (viewModel.selectedLetter == null) PrimaryIndigo else OutlineVariantColor.copy(alpha = 0.2f))
+                        .background(if (viewModel.selectedLetter == null) PrimaryIndigo else MaterialTheme.colorScheme.surfaceVariant)
                         .clickable { viewModel.selectedLetter = null }
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    Text(
-                        "All",
-                        color = if (viewModel.selectedLetter == null) Color.White else OutlineColor,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("All", color = if (viewModel.selectedLetter == null) Color.White else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
                 }
             }
             items(letters) { letter ->
@@ -87,14 +80,14 @@ fun LibraryScreen(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(if (viewModel.selectedLetter == letter) PrimaryIndigo else OutlineVariantColor.copy(alpha = 0.2f))
+                        .background(if (viewModel.selectedLetter == letter) PrimaryIndigo else MaterialTheme.colorScheme.surfaceVariant)
                         .clickable { viewModel.selectedLetter = if (viewModel.selectedLetter == letter) null else letter }
                         .padding(8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         letter.toString(),
-                        color = if (viewModel.selectedLetter == letter) Color.White else OutlineColor,
+                        color = if (viewModel.selectedLetter == letter) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -102,16 +95,11 @@ fun LibraryScreen(
         }
 
         if (filteredCards.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text(
                     text = if (totalCount == 0) "No words in your library yet.\nStart learning a deck to add words!" else "No search results matches.",
                     textAlign = TextAlign.Center,
-                    color = OutlineColor,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 15.sp
                 )
             }
@@ -134,33 +122,28 @@ fun LibraryScreen(
 fun LibraryWordCard(card: Card) {
     Box(
         modifier = Modifier
-            .background(Color.White, RoundedCornerShape(16.dp))
-            .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
                 modifier = Modifier
-                    .background(PrimaryIndigo.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                    .background(PrimaryIndigo.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(card.pos, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
             }
-
-            Text(card.englishWord, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
-            Text(card.pronunciation, fontSize = 12.sp, fontStyle = FontStyle.Italic, color = OutlineColor)
-
-            HorizontalDivider(color = OutlineVariantColor.copy(alpha = 0.3f))
-
-            Text(card.definition, fontSize = 13.sp, color = OutlineColor, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Text(card.englishWord, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text(card.pronunciation, fontSize = 12.sp, fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            Text(card.definition, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
             if (card.exampleSentence.isNotEmpty()) {
                 Text(
                     "\"${card.exampleSentence}\"",
                     fontSize = 12.sp,
                     fontStyle = FontStyle.Italic,
-                    color = OutlineColor.copy(alpha = 0.8f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                 )
             }
         }

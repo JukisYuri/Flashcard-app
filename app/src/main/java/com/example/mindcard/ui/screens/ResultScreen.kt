@@ -19,6 +19,9 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
 import com.example.mindcard.FlashcardStudy
 import com.example.mindcard.Main
+import com.example.mindcard.ui.main.PrimaryIndigo
+import com.example.mindcard.ui.main.SecondaryGreen
+import com.example.mindcard.ui.main.AccentYellow
 
 @Composable
 fun ResultScreen(
@@ -32,7 +35,7 @@ fun ResultScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(BackgroundFrost)
+            .background(MaterialTheme.colorScheme.background)
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -41,65 +44,28 @@ fun ResultScreen(
             verticalArrangement = Arrangement.spacedBy(24.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                text = "Well Done!",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = PrimaryIndigo
-            )
+            Text("Well Done!", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
+            Text("You've crushed another lesson.", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            Text(
-                text = "You've crushed another lesson.",
-                fontSize = 16.sp,
-                color = OutlineColor
-            )
-
-            // Trophy illustration symbol
             Box(
                 modifier = Modifier
                     .size(140.dp)
-                    .background(Color(0xFFFFE083).copy(alpha = 0.2f), CircleShape)
-                    .border(2.dp, Color(0xFFFFE083), CircleShape),
+                    .background(AccentYellow.copy(alpha = 0.2f), CircleShape)
+                    .border(2.dp, AccentYellow, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text("🏆", fontSize = 72.sp)
             }
 
-            // Stats Bento Grid
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatResultItem(
-                    label = "Accuracy",
-                    value = "$accuracy%",
-                    icon = "🎯",
-                    color = SecondaryGreen,
-                    modifier = Modifier.weight(1f)
-                )
-                StatResultItem(
-                    label = "XP Gained",
-                    value = "+$xpEarned",
-                    icon = "⚡",
-                    color = TertiaryYellow,
-                    modifier = Modifier.weight(1f)
-                )
-                StatResultItem(
-                    label = "Duration",
-                    value = "${timeMinutes}m",
-                    icon = "⏱️",
-                    color = PrimaryIndigo,
-                    modifier = Modifier.weight(1f)
-                )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatResultItem("Accuracy", "$accuracy%", "🎯", SecondaryGreen, Modifier.weight(1f))
+                StatResultItem("XP Gained", "+$xpEarned", "⚡", AccentYellow, Modifier.weight(1f))
+                StatResultItem("Duration", "${timeMinutes}m", "⏱️", PrimaryIndigo, Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Restart button
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedButton(
                     onClick = { onNavigate(FlashcardStudy(deckId)) },
                     shape = RoundedCornerShape(16.dp),
@@ -114,7 +80,6 @@ fun ResultScreen(
                     }
                 }
 
-                // Home button
                 Button(
                     onClick = { onNavigate(Main) },
                     shape = RoundedCornerShape(16.dp),
@@ -138,8 +103,8 @@ fun StatResultItem(
 ) {
     Box(
         modifier = modifier
-            .background(Color.White, RoundedCornerShape(16.dp))
-            .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
             .padding(12.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -149,7 +114,7 @@ fun StatResultItem(
         ) {
             Text(icon, fontSize = 24.sp)
             Text(value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = color)
-            Text(label.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = OutlineColor)
+            Text(label.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

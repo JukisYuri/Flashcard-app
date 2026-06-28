@@ -12,7 +12,7 @@ import com.example.mindcard.data.Database
 import com.example.mindcard.data.repository.AuthRepository
 
 @Composable
-fun MainNavigation() {
+fun MainNavigation(onThemeChanged: ((Boolean) -> Unit)? = null) {
   val authRepository = remember { AuthRepository() }
   val initialScreen = if (authRepository.isUserSignedIn()) {
       Database.initializeUserPersistence(authRepository.getCurrentUser()!!.uid)
@@ -72,7 +72,10 @@ fun MainNavigation() {
           CreateCardScreen(deckId = entry.deckId, onNavigate = { navKey -> backStack.add(navKey) })
         }
         entry<Settings> {
-          SettingsScreen(onNavigate = { navKey -> backStack.add(navKey) })
+          SettingsScreen(
+            onNavigate = { navKey -> backStack.add(navKey) },
+            onThemeChanged = onThemeChanged
+          )
         }
       },
   )

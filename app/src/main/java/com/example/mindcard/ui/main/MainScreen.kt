@@ -41,7 +41,6 @@ fun MainScreen(
 ) {
     var activeTab by remember { mutableStateOf(ActiveTab.Home) }
     val profile by viewModel.userProfile
-    val decksList = viewModel.decks
     var showSyncDialog by remember { mutableStateOf(false) }
     val isOnline = remember { mutableStateOf(Database.isOnline()) }
 
@@ -65,17 +64,16 @@ fun MainScreen(
                             text = "Mind Card",
                             fontWeight = FontWeight.Bold,
                             fontSize = 22.sp,
-                            color = PrimaryIndigo
+                            color = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 },
                 actions = {
-                    // Online/Offline indicator
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(if (isOnline.value) Color(0xFF2ECC71).copy(alpha = 0.2f) else Color(0xFFFF6B6B).copy(alpha = 0.2f))
-                            .border(1.dp, if (isOnline.value) Color(0xFF2ECC71) else Color(0xFFFF6B6B), CircleShape)
+                            .background(if (isOnline.value) Color(0xFF00D68F).copy(alpha = 0.2f) else Color(0xFFFF6B6B).copy(alpha = 0.2f))
+                            .border(1.dp, if (isOnline.value) Color(0xFF00D68F) else Color(0xFFFF6B6B), CircleShape)
                             .clickable { showSyncDialog = true }
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                         contentAlignment = Alignment.Center
@@ -88,14 +86,14 @@ fun MainScreen(
                                 modifier = Modifier
                                     .size(8.dp)
                                     .background(
-                                        if (isOnline.value) Color(0xFF2ECC71) else Color(0xFFFF6B6B),
+                                        if (isOnline.value) Color(0xFF00D68F) else Color(0xFFFF6B6B),
                                         CircleShape
                                     )
                             )
                             Text(
                                 text = if (isOnline.value) "Online" else "Offline",
                                 fontWeight = FontWeight.Bold,
-                                color = if (isOnline.value) Color(0xFF2ECC71) else Color(0xFFFF6B6B),
+                                color = if (isOnline.value) Color(0xFF00D68F) else Color(0xFFFF6B6B),
                                 fontSize = 12.sp
                             )
                         }
@@ -103,30 +101,29 @@ fun MainScreen(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // Streak badge
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(Color(0xFFFFE083).copy(alpha = 0.2f))
-                            .border(1.dp, Color(0xFFFFE083), CircleShape)
+                            .background(AccentYellow.copy(alpha = 0.2f))
+                            .border(1.dp, AccentYellow, CircleShape)
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = "${profile.currentStreak} 🔥",
                             fontWeight = FontWeight.Bold,
-                            color = TertiaryYellow,
+                            color = AccentYellow,
                             fontSize = 14.sp
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = BackgroundFrost.copy(alpha = 0.8f)
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
         bottomBar = {
             NavigationBar(
-                containerColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 8.dp
             ) {
                 val items = listOf(
@@ -145,9 +142,9 @@ fun MainScreen(
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = PrimaryIndigo,
                             selectedTextColor = PrimaryIndigo,
-                            unselectedIconColor = OutlineColor,
-                            unselectedTextColor = OutlineColor,
-                            indicatorColor = Color(0xFFE1E0FF)
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            indicatorColor = PrimaryIndigo.copy(alpha = 0.15f)
                         )
                     )
                 }
@@ -165,7 +162,7 @@ fun MainScreen(
                 }
             }
         },
-        containerColor = BackgroundFrost
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -185,7 +182,6 @@ fun MainScreen(
         }
     }
 
-    // Sync Dialog
     if (showSyncDialog) {
         AlertDialog(
             onDismissRequest = { showSyncDialog = false },
@@ -194,25 +190,18 @@ fun MainScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Sync,
-                        contentDescription = null,
-                        tint = PrimaryIndigo
-                    )
+                    Icon(Icons.Default.Sync, contentDescription = null, tint = PrimaryIndigo)
                     Text("Sync & Offline", fontWeight = FontWeight.Bold)
                 }
             },
             text = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Connection status
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Trạng thái:", fontWeight = FontWeight.Bold)
+                        Text("Status:", fontWeight = FontWeight.Bold)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -221,45 +210,32 @@ fun MainScreen(
                                 modifier = Modifier
                                     .size(10.dp)
                                     .background(
-                                        if (isOnline.value) Color(0xFF2ECC71) else Color(0xFFFF6B6B),
+                                        if (isOnline.value) Color(0xFF00D68F) else Color(0xFFFF6B6B),
                                         CircleShape
                                     )
                             )
                             Text(
-                                if (isOnline.value) "Đang kết nối" else "Offline",
-                                color = if (isOnline.value) Color(0xFF2ECC71) else Color(0xFFFF6B6B),
+                                if (isOnline.value) "Connected" else "Offline",
+                                color = if (isOnline.value) Color(0xFF00D68F) else Color(0xFFFF6B6B),
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
-
                     HorizontalDivider()
-
-                    // Sync action
-                    Text(
-                        "Nhấn Sync để đồng bộ dữ liệu giữa thiết bị và đám mây.",
-                        fontSize = 13.sp,
-                        color = OutlineColor
-                    )
-
-                    // Offline mode toggle
+                    Text("Tap Sync to sync data between device and cloud.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Chế độ Offline", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text("Bắt buộc dùng dữ liệu cục bộ", fontSize = 12.sp, color = OutlineColor)
+                            Text("Offline Mode", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Force local data only", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Switch(
                             checked = !isOnline.value,
                             onCheckedChange = { offline ->
-                                if (offline) {
-                                    Database.forceOfflineMode()
-                                } else {
-                                    Database.forceOnlineMode()
-                                }
+                                if (offline) Database.forceOfflineMode() else Database.forceOnlineMode()
                                 isOnline.value = Database.isOnline()
                             },
                             colors = SwitchDefaults.colors(
@@ -285,9 +261,7 @@ fun MainScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showSyncDialog = false }) {
-                    Text("Đóng")
-                }
+                TextButton(onClick = { showSyncDialog = false }) { Text("Close") }
             }
         )
     }
