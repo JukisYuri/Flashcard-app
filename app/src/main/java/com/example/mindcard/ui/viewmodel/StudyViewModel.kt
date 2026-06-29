@@ -1,5 +1,7 @@
 package com.example.mindcard.ui.viewmodel
 
+import android.content.Context
+import android.speech.tts.TextToSpeech
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -7,9 +9,12 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.example.mindcard.data.*
 import com.example.mindcard.data.repository.DeckRepository
+import java.util.Locale
 
 class StudyViewModel : ViewModel() {
     private val deckRepository = DeckRepository()
+    private var tts: TextToSpeech? = null
+    var ttsReady by mutableStateOf(false)
 
     var currentDeck by mutableStateOf<Deck?>(null)
     var currentCardIndex by mutableIntStateOf(0)
@@ -23,6 +28,19 @@ class StudyViewModel : ViewModel() {
 
     // Due cards for this session
     private var dueCards = mutableListOf<Card>()
+
+    fun initTTS(context: Context) {
+        tts = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale.US
+                ttsReady = true
+            }
+        }
+    }
+
+    fun speak(text: String) {
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+    }
 
     fun startStudySession(deck: Deck) {
         currentDeck = deck
@@ -88,5 +106,11 @@ class StudyViewModel : ViewModel() {
                 onFinished(accuracy, xpEarned)
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        tts?.stop()
+        tts?.shutdown()
     }
 }

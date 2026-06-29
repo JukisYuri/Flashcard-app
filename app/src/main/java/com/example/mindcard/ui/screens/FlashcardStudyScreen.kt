@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +38,12 @@ fun FlashcardStudyScreen(
     modifier: Modifier = Modifier,
     viewModel: StudyViewModel = viewModel()
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.initTTS(context)
+    }
+
     val deck = remember(deckId, Database.decks) {
         Database.decks.firstOrNull { it.id == deckId }
     }
@@ -64,6 +71,13 @@ fun FlashcardStudyScreen(
     val rotation by animateFloatAsState(
         targetValue = if (viewModel.isCardFlipped) 180f else 0f
     )
+
+    // Speak word when card is first shown
+    LaunchedEffect(viewModel.currentCardIndex) {
+        if (viewModel.ttsReady) {
+            viewModel.speak(currentCard.englishWord)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -145,6 +159,30 @@ fun FlashcardStudyScreen(
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center
                         )
+
+                        // Speaker button
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.clickable {
+                                if (viewModel.ttsReady) {
+                                    viewModel.speak(currentCard.englishWord)
+                                }
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.VolumeUp,
+                                contentDescription = "Listen",
+                                tint = PrimaryIndigo,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                "Tap to listen",
+                                fontSize = 12.sp,
+                                color = PrimaryIndigo,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
 
                         Text(
                             text = currentCard.pronunciation,

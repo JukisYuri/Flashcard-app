@@ -7,6 +7,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
 import com.example.mindcard.CreateCard
 import com.example.mindcard.CreateDeck
+import com.example.mindcard.DailyChallenge
 import com.example.mindcard.FlashcardStudy
 import com.example.mindcard.data.Deck
 import com.example.mindcard.data.FsrsAlgorithm
@@ -151,6 +154,35 @@ fun HomeScreen(
                         )
                     }
                 }
+            }
+        }
+
+        // Daily Challenge Button
+        Card(
+            onClick = { onItemClick(DailyChallenge) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = SecondaryGreen.copy(alpha = 0.15f)),
+            border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+        ) {
+            Row(
+                modifier = Modifier.padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(SecondaryGreen.copy(alpha = 0.2f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("⚡", fontSize = 24.sp)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Daily Challenge", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Test your vocabulary with 5 random words!", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = SecondaryGreen)
             }
         }
 

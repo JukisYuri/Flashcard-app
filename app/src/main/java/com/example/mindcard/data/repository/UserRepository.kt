@@ -19,4 +19,8 @@ class UserRepository {
         val currentProfile = Database.userProfile.value
         Database.updateUserProfile(currentProfile.copy(currentStreak = 1))
     }
+
+    fun markTodayAsActive() {
+        Database.markTodayAsActive()
+    }
 }

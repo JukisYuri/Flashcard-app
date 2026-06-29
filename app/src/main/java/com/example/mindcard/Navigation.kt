@@ -77,6 +77,12 @@ fun MainNavigation(onThemeChanged: ((Boolean) -> Unit)? = null) {
             onThemeChanged = onThemeChanged
           )
         }
+        entry<Leaderboard> {
+          LeaderboardScreen(onNavigate = { navKey -> backStack.add(navKey) })
+        }
+        entry<DailyChallenge> {
+          DailyChallengeScreen(onNavigate = { navKey -> backStack.add(navKey) })
+        }
       },
   )
 }

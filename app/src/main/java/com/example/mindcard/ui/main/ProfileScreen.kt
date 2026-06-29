@@ -25,6 +25,7 @@ import java.util.Calendar
 fun ProfileScreen(
     onLogoutClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
+    onLeaderboardClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = viewModel()
 ) {
@@ -195,6 +196,51 @@ fun ProfileScreen(
             }
         }
 
+        // Badges Section
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(24.dp),
+            border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Achievements", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    BadgeCircle("🔥", "Streak Lord", profile.currentStreak >= 7)
+                    BadgeCircle("🧠", "Vocab Master", profile.totalWordsLearned >= 10)
+                    BadgeCircle("⚡", "XP Hunter", profile.totalXp >= 100)
+                    BadgeCircle("📚", "Bookworm", profile.totalWordsLearned >= 50)
+                    BadgeCircle("🎯", "Sharpshooter", profile.currentStreak >= 30)
+                    BadgeCircle("🔒", "Super Learner", profile.totalXp >= 500)
+                }
+            }
+        }
+
+        // Leaderboard Button
+        Card(
+            onClick = onLeaderboardClick,
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = AccentYellow.copy(alpha = 0.1f)),
+            shape = RoundedCornerShape(16.dp),
+            border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("🏆", fontSize = 24.sp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Leaderboard", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text("See how you rank against other learners", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AccentYellow)
+            }
+        }
+
         if (viewModel.isEditingName) {
             AlertDialog(
                 onDismissRequest = { viewModel.cancelEditing() },
@@ -224,5 +270,23 @@ fun ProfileStatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
         Text(label, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun BadgeCircle(emoji: String, name: String, unlocked: Boolean) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(if (unlocked) AccentYellow.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant)
+                .border(2.dp, if (unlocked) AccentYellow else Color.Transparent, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(if (unlocked) emoji else "🔒", fontSize = 20.sp)
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(name, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, fontWeight = FontWeight.Bold)
     }
 }
