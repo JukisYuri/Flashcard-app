@@ -10,10 +10,10 @@ plugins {
 
 android {
     namespace = "com.example.mindcard"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = "com.example.mindcard"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -98,8 +98,8 @@ dependencies {
   implementation(libs.androidx.lifecycle.viewmodel.compose)
 
   // Material Icons
-  implementation("androidx.compose.material:material-icons-core")
-  implementation("androidx.compose.material:material-icons-extended")
+  implementation(libs.androidx.compose.material.icons.core)
+  implementation(libs.androidx.compose.material.icons.extended)
 
   // Firebase Authentication
   implementation(platform(libs.firebase.bom))
