@@ -492,11 +492,16 @@ object Database {
         if (userId != null) {
             val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
             scope.launch {
-                if (useOfflineMode) {
-                    syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(profile, userId))
+                syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(profile, userId))
+                if (syncManager?.isOnline() == true) {
+                    useOfflineMode = false
+                    try {
+                        ApiClient.put<UserProfile, UserProfile>("/users/$userId", profile)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 } else {
-                    ApiClient.put<UserProfile, UserProfile>("/users/$userId", profile)
-                    syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(profile, userId))
+                    useOfflineMode = true
                 }
             }
         }
@@ -855,7 +860,11 @@ object Database {
 
     suspend fun syncNowSuspend() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val userId = currentUserId ?: return@withContext
-        if (useOfflineMode) return@withContext
+        if (syncManager?.isOnline() != true) {
+            useOfflineMode = true
+            return@withContext
+        }
+        useOfflineMode = false
         try {
             val dbInstance = appDatabase ?: return@withContext
 
