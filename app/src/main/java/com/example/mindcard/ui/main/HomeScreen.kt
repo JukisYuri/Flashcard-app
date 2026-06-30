@@ -7,6 +7,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -21,19 +24,21 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
 import com.example.mindcard.CreateCard
 import com.example.mindcard.CreateDeck
+import com.example.mindcard.DailyChallenge
 import com.example.mindcard.FlashcardStudy
 import com.example.mindcard.data.Deck
+import com.example.mindcard.data.FsrsAlgorithm
 import com.example.mindcard.ui.screens.*
 
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mindcard.ui.viewmodel.HomeViewModel
 
-// Colors updated to match the provided screen14.png design
-val PrimaryIndigo = Color(0xFF4648D4)
-val SecondaryGreen = Color(0xFF2ECC71)
-val DarkGreen = Color(0xFF007A33)
-val BackgroundFrost = Color(0xFFF7F9FB)
-val OutlineColor = Color(0xFF767586)
+val PrimaryIndigo = Color(0xFF6C63FF)
+val SecondaryGreen = Color(0xFF00D68F)
+val DarkGreen = Color(0xFF00B377)
+val AccentYellow = Color(0xFFFFD93D)
+val BackgroundFrost = Color(0xFFF8F9FE)
+val OutlineColor = Color(0xFF6B7280)
 val OutlineVariantColor = Color(0xFFE5E7EB)
 
 @Composable
@@ -45,28 +50,36 @@ fun HomeScreen(
     val scrollState = rememberScrollState()
     val userProfile by viewModel.userProfile
     val decks = viewModel.decks
+    val totalDueCards = viewModel.getTotalDueCards()
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(BackgroundFrost)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(scrollState)
             .padding(horizontal = 20.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
-        // --- Daily Goals Section ---
         Text(
             text = "Daily Goals",
             fontSize = 22.sp,
             fontWeight = FontWeight.Medium,
-            color = Color(0xFF191C1E)
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Words learned goal card
+            GoalCardCircular(
+                title = "DUE CARDS",
+                value = "$totalDueCards",
+                goal = "cards",
+                progress = if (totalDueCards > 0) minOf(1f, totalDueCards.toFloat() / 20) else 0f,
+                progressColor = Color(0xFFFF6B6B),
+                isTimer = false
+            )
+
             val wordsLearned = userProfile.totalWordsLearned
             val wordsGoal = 30
             val progressWords = if (wordsGoal > 0) minOf(1f, wordsLearned.toFloat() / wordsGoal) else 0f
@@ -80,7 +93,6 @@ fun HomeScreen(
                 isTimer = false
             )
 
-            // Time spent goal card
             val timeSpent = viewModel.currentSessionTime
             val timeGoal = 15f
             val progressTime = if (timeSpent > 0) minOf(1f, timeSpent / timeGoal) else 0f
@@ -95,7 +107,85 @@ fun HomeScreen(
             )
         }
 
-        // --- Your Flashcard Sets Section ---
+        // Word of the Day
+        val allCards = decks.flatMap { it.cards }
+        val wordOfTheDay = if (allCards.isNotEmpty()) allCards.random() else null
+        if (wordOfTheDay != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = PrimaryIndigo.copy(alpha = 0.1f)),
+                border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("✨", fontSize = 18.sp)
+                        Text("Word of the Day", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
+                    }
+                    Text(
+                        text = wordOfTheDay.englishWord,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = wordOfTheDay.pronunciation,
+                        fontSize = 14.sp,
+                        fontStyle = FontStyle.Italic,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = wordOfTheDay.definition,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (wordOfTheDay.exampleSentence.isNotEmpty()) {
+                        Text(
+                            text = "\"${wordOfTheDay.exampleSentence}\"",
+                            fontSize = 13.sp,
+                            fontStyle = FontStyle.Italic,
+                            color = PrimaryIndigo.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Daily Challenge Button
+        Card(
+            onClick = { onItemClick(DailyChallenge) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = SecondaryGreen.copy(alpha = 0.15f)),
+            border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+        ) {
+            Row(
+                modifier = Modifier.padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(SecondaryGreen.copy(alpha = 0.2f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("⚡", fontSize = 24.sp)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Daily Challenge", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Test your vocabulary with 5 random words!", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = SecondaryGreen)
+            }
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -105,14 +195,14 @@ fun HomeScreen(
                 text = "Your Flashcard Sets",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF191C1E)
+                color = MaterialTheme.colorScheme.onBackground
             )
             Text(
                 text = "Show more",
                 color = PrimaryIndigo,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
-                modifier = Modifier.clickable { /* TODO: Navigate to library */ }
+                modifier = Modifier.clickable { }
             )
         }
 
@@ -125,13 +215,11 @@ fun HomeScreen(
                 onSeedClick = { viewModel.seedDemoData() }
             )
         } else {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 decks.forEachIndexed { index, deck ->
                     DeckCardVertical(
                         deck = deck,
-                        isHot = index == 0, // Set the first one as "Hot" for demo purpose
+                        isHot = index == 0,
                         onClick = {
                             if (deck.cards.isNotEmpty()) {
                                 onItemClick(FlashcardStudy(deck.id))
@@ -144,7 +232,6 @@ fun HomeScreen(
             }
         }
 
-        // Spacer to prevent FAB from overlapping content
         Spacer(modifier = Modifier.height(80.dp))
     }
 }
@@ -160,9 +247,9 @@ fun GoalCardCircular(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(32.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
@@ -176,7 +263,7 @@ fun GoalCardCircular(
                     text = title,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF374151),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -185,14 +272,14 @@ fun GoalCardCircular(
                         text = value,
                         fontSize = 44.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF111827),
+                        color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = 44.sp
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = goal,
                         fontSize = 20.sp,
-                        color = Color(0xFF6B7280),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
                 }
@@ -202,15 +289,13 @@ fun GoalCardCircular(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.size(90.dp)
             ) {
-                // Background Track
                 CircularProgressIndicator(
                     progress = { 1f },
                     modifier = Modifier.fillMaxSize(),
-                    color = OutlineVariantColor,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                     strokeWidth = 8.dp,
                     strokeCap = StrokeCap.Round
                 )
-                // Active Progress
                 CircularProgressIndicator(
                     progress = { progress },
                     modifier = Modifier.fillMaxSize(),
@@ -249,8 +334,8 @@ fun DeckCardVertical(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
@@ -258,17 +343,15 @@ fun DeckCardVertical(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Top Row: Avatar & Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                // Avatar Badge (First letter of deck name)
                 Box(
                     modifier = Modifier
                         .size(52.dp)
-                        .background(Color(0xFFE5E4FF), CircleShape),
+                        .background(PrimaryIndigo.copy(alpha = 0.15f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -282,20 +365,19 @@ fun DeckCardVertical(
                 if (isHot) {
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFFFFE082), RoundedCornerShape(12.dp))
+                            .background(AccentYellow.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                             .padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = "Hot",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF424242)
+                            color = AccentYellow
                         )
                     }
                 }
             }
 
-            // Middle Text Info
             Column(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.padding(top = 8.dp)
@@ -304,16 +386,32 @@ fun DeckCardVertical(
                     text = deck.name,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color(0xFF191C1E)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    text = "${deck.cards.size} Cards total",
-                    fontSize = 15.sp,
-                    color = OutlineColor
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "${deck.cards.size} Cards total",
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    val dueCount = FsrsAlgorithm.getDueCardsCount(deck.cards)
+                    if (dueCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0xFFFF6B6B).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "$dueCount due",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFF6B6B)
+                            )
+                        }
+                    }
+                }
             }
 
-            // Bottom Progress Bar
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.padding(top = 12.dp)
@@ -326,14 +424,14 @@ fun DeckCardVertical(
                         .height(10.dp)
                         .clip(RoundedCornerShape(5.dp)),
                     color = SecondaryGreen,
-                    trackColor = OutlineVariantColor,
+                    trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
                     strokeCap = StrokeCap.Round
                 )
                 Text(
                     text = "${deck.masteredPercentage}% Mastered",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = DarkGreen,
+                    color = SecondaryGreen,
                     modifier = Modifier.align(Alignment.End)
                 )
             }
@@ -352,13 +450,13 @@ fun EmptyStateCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White, RoundedCornerShape(24.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(24.dp))
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
-        Text(subtitle, fontSize = 14.sp, color = OutlineColor, textAlign = TextAlign.Center)
+        Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+        Text(subtitle, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
 
         Button(
             onClick = onClick,

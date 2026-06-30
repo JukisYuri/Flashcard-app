@@ -12,3 +12,6 @@ import kotlinx.serialization.Serializable
 @Serializable data class CreateDeck(val deckId: String? = null) : NavKey
 @Serializable data object CreateAI : NavKey
 @Serializable data class CreateCard(val deckId: String) : NavKey
+@Serializable data object Settings : NavKey
+@Serializable data object Leaderboard : NavKey
+@Serializable data object DailyChallenge : NavKey

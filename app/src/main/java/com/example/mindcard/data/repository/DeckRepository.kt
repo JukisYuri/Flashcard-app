@@ -58,6 +58,18 @@ class DeckRepository {
         Database.recordStudySession(deckId, accuracy, xp, timeMinutes)
     }
 
+    fun updateCardState(deckId: String, updatedCard: Card) {
+        Database.updateCardState(deckId, updatedCard)
+    }
+
+    fun updateDeckMastery(deckId: String, mastery: Int) {
+        Database.updateDeckMastery(deckId, mastery)
+    }
+
+    fun updateDeckTags(deckId: String, tags: List<String>) {
+        Database.updateDeckTags(deckId, tags)
+    }
+
     fun seedDemoData() {
         Database.seedDemoData()
     }

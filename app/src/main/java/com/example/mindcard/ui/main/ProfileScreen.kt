@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,31 +17,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.mindcard.ui.screens.*
+import com.example.mindcard.Settings
 import com.example.mindcard.ui.viewmodel.ProfileViewModel
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Locale
 
 @Composable
 fun ProfileScreen(
     onLogoutClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
+    onLeaderboardClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = viewModel()
 ) {
     val profile by viewModel.userProfile
 
-    // Dynamic weekly activity calculation
     val weekDaysInfo = remember(profile.studyHistory) {
         val calendar = Calendar.getInstance()
         val currentDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
         val daysToSubtract = if (currentDayOfWeek == Calendar.SUNDAY) 6 else currentDayOfWeek - Calendar.MONDAY
-        
-        val mondayCal = Calendar.getInstance().apply {
-            add(Calendar.DAY_OF_YEAR, -daysToSubtract)
-        }
-
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val mondayCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -daysToSubtract) }
+        val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
         val todayStr = dateFormat.format(Calendar.getInstance().time)
 
         (0..6).map { i ->
@@ -66,17 +63,17 @@ fun ProfileScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Text("My Profile", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
+        Text("My Profile", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
 
-        // Hero Info Card
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(24.dp))
-                .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(24.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
                 .padding(20.dp)
         ) {
             Column(
@@ -84,32 +81,31 @@ fun ProfileScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Avatar
                 Box(
                     modifier = Modifier
                         .size(88.dp)
                         .clip(CircleShape)
-                        .background(PrimaryIndigo.copy(alpha = 0.1f))
+                        .background(PrimaryIndigo.copy(alpha = 0.15f))
                         .border(2.dp, PrimaryIndigo, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("🧑‍🎓", fontSize = 48.sp)
                 }
 
-                Text(profile.name, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
-                Text(profile.title, fontSize = 14.sp, color = OutlineColor)
+                Text(profile.name, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Text(profile.title, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(BackgroundFrost, RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
                         .padding(12.dp),
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
                     ProfileStatItem("XP", "${profile.totalXp}")
-                    HorizontalDivider(modifier = Modifier.width(1.dp).height(24.dp).align(Alignment.CenterVertically))
+                    HorizontalDivider(modifier = Modifier.width(1.dp).height(24.dp).align(Alignment.CenterVertically), color = MaterialTheme.colorScheme.outline)
                     ProfileStatItem("Words", "${profile.totalWordsLearned}")
-                    HorizontalDivider(modifier = Modifier.width(1.dp).height(24.dp).align(Alignment.CenterVertically))
+                    HorizontalDivider(modifier = Modifier.width(1.dp).height(24.dp).align(Alignment.CenterVertically), color = MaterialTheme.colorScheme.outline)
                     ProfileStatItem("Streak", "${profile.currentStreak}")
                 }
 
@@ -117,50 +113,64 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Button(
+                    OutlinedButton(
                         onClick = { viewModel.startEditing() },
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryIndigo),
+                        border = ButtonDefaults.outlinedButtonBorder(enabled = true)
                     ) {
-                        Text("Edit Profile", fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Edit", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
 
-                    Button(
-                        onClick = onLogoutClick,
+                    OutlinedButton(
+                        onClick = onSettingsClick,
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFDAD6)),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryIndigo),
+                        border = ButtonDefaults.outlinedButtonBorder(enabled = true)
                     ) {
-                        Text("Log Out", fontWeight = FontWeight.Bold, color = Color(0xFFBA1A1A))
+                        Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Settings", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
+                }
+
+                Button(
+                    onClick = onLogoutClick,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B6B).copy(alpha = 0.15f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color(0xFFFF6B6B))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Log Out", fontWeight = FontWeight.Bold, color = Color(0xFFFF6B6B), fontSize = 14.sp)
                 }
             }
         }
 
-        // Weekly activity bar chart
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(24.dp))
-                .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(24.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
                 .padding(16.dp)
         ) {
-            Text("Weekly Activity", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
-            Text("Days active this week: $activeDaysCount/7 days", fontSize = 12.sp, color = OutlineColor)
+            Text("Weekly Activity", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text("Days active this week: $activeDaysCount/7 days", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp),
+                modifier = Modifier.fillMaxWidth().height(100.dp),
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.Bottom
             ) {
                 weekDaysInfo.forEach { (name, studied, isToday) ->
                     val barHeight = if (studied) 80.dp else 12.dp
-                    val barColor = if (isToday) PrimaryIndigo else if (studied) PrimaryIndigo.copy(alpha = 0.6f) else Color(0xFFF2F4F6)
+                    val barColor = if (isToday) PrimaryIndigo else if (studied) PrimaryIndigo.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -179,57 +189,79 @@ fun ProfileScreen(
                             text = name,
                             fontSize = 11.sp,
                             fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.Bold,
-                            color = if (isToday) PrimaryIndigo else OutlineColor
+                            color = if (isToday) PrimaryIndigo else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
         }
 
-        // Badges grid
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(24.dp))
-                .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
-                .padding(16.dp)
+        // Badges Section
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(24.dp),
+            border = ButtonDefaults.outlinedButtonBorder(enabled = true)
         ) {
-            Text("Badges", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                BadgeCircle("🔥", "Streak Lord", unlocked = profile.currentStreak > 0)
-                BadgeCircle("🧠", "Vocab Master", unlocked = profile.totalWordsLearned > 0)
-                BadgeCircle("⚡", "XP Earned", unlocked = profile.totalXp > 0)
-                BadgeCircle("🔒", "Super Learner", unlocked = false)
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Achievements", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    BadgeCircle("🔥", "Streak Lord", profile.currentStreak >= 7)
+                    BadgeCircle("🧠", "Vocab Master", profile.totalWordsLearned >= 10)
+                    BadgeCircle("⚡", "XP Hunter", profile.totalXp >= 100)
+                    BadgeCircle("📚", "Bookworm", profile.totalWordsLearned >= 50)
+                    BadgeCircle("🎯", "Sharpshooter", profile.currentStreak >= 30)
+                    BadgeCircle("🔒", "Super Learner", profile.totalXp >= 500)
+                }
             }
         }
-    }
 
-    if (viewModel.isEditingName) {
-        AlertDialog(
-            onDismissRequest = { viewModel.cancelEditing() },
-            title = { Text("Edit Name") },
-            text = {
-                OutlinedTextField(
-                    value = viewModel.editNameInput,
-                    onValueChange = { viewModel.editNameInput = it },
-                    label = { Text("Display Name") }
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.saveProfileName() },
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo)
-                ) {
-                    Text("Save")
+        // Leaderboard Button
+        Card(
+            onClick = onLeaderboardClick,
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = AccentYellow.copy(alpha = 0.1f)),
+            shape = RoundedCornerShape(16.dp),
+            border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("🏆", fontSize = 24.sp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Leaderboard", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text("See how you rank against other learners", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.cancelEditing() }) {
-                    Text("Cancel")
-                }
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AccentYellow)
             }
-        )
+        }
+
+        if (viewModel.isEditingName) {
+            AlertDialog(
+                onDismissRequest = { viewModel.cancelEditing() },
+                title = { Text("Edit Name") },
+                text = {
+                    OutlinedTextField(
+                        value = viewModel.editNameInput,
+                        onValueChange = { viewModel.editNameInput = it },
+                        label = { Text("Display Name") }
+                    )
+                },
+                confirmButton = {
+                    Button(onClick = { viewModel.saveProfileName() }, colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo)) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.cancelEditing() }) { Text("Cancel") }
+                }
+            )
+        }
     }
 }
 
@@ -237,7 +269,7 @@ fun ProfileScreen(
 fun ProfileStatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
-        Text(label, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = OutlineColor)
+        Text(label, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -246,15 +278,15 @@ fun BadgeCircle(emoji: String, name: String, unlocked: Boolean) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .size(54.dp)
+                .size(44.dp)
                 .clip(CircleShape)
-                .background(if (unlocked) Color(0xFFFFE083).copy(alpha = 0.4f) else Color(0xFFF2F4F6))
-                .border(2.dp, if (unlocked) Color(0xFFFFE083) else Color.Transparent, CircleShape),
+                .background(if (unlocked) AccentYellow.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant)
+                .border(2.dp, if (unlocked) AccentYellow else Color.Transparent, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text(if (unlocked) emoji else "🔒", fontSize = 24.sp)
+            Text(if (unlocked) emoji else "🔒", fontSize = 20.sp)
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Text(name, fontSize = 10.sp, color = OutlineColor, maxLines = 1, fontWeight = FontWeight.Bold)
+        Text(name, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, fontWeight = FontWeight.Bold)
     }
 }
