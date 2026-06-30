@@ -45,7 +45,7 @@ fun MainScreen(
     var activeTab by remember { mutableStateOf(ActiveTab.Home) }
     val profile by viewModel.userProfile
     var showSyncDialog by remember { mutableStateOf(false) }
-    val isOnline = remember { mutableStateOf(Database.isOnline()) }
+    val isOnline = remember { mutableStateOf<Boolean>(Database.isOnline()) }
 
     val dueCount = viewModel.getTotalDueCards()
 

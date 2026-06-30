@@ -64,6 +64,5 @@ class HomeViewModel : ViewModel() {
 
     fun dismissReviewGateResult() {
         showReviewGateResult = false
->>>>>>> master
     }
 }

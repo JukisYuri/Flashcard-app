@@ -170,6 +170,7 @@ object Database {
                 }
             }
         }
+    }
 
     private fun loadFromLocalDatabase(userId: String) {
         val database = appDatabase ?: return
@@ -197,53 +198,6 @@ object Database {
         }
     }
 
-    private fun setupFirestoreListeners(userId: String) {
-        // Listen to profile
-        val profileRef = db.collection("users").document(userId)
-        profileListener = profileRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                // Fallback to local database
-                loadFromLocalDatabase(userId)
-                return@addSnapshotListener
-            }
-            if (snapshot != null && snapshot.exists()) {
-                val profile = snapshot.toObject(UserProfile::class.java)
-                if (profile != null) {
-                    userProfile.value = profile
-                    // Save to local database
-                    saveProfileToLocal(userId, profile)
-                }
-            } else {
-                // If profile doesn't exist, create it
-                val displayName = FirebaseAuth.getInstance().currentUser?.displayName ?: "Learner"
-                val initialProfile = UserProfile(name = displayName)
-                profileRef.set(initialProfile)
-                saveProfileToLocal(userId, initialProfile)
-            }
-        }
-
-        // Listen to decks
-        val decksRef = db.collection("users").document(userId).collection("decks")
-        decksListener = decksRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                loadFromLocalDatabase(userId)
-                return@addSnapshotListener
-            }
-            if (skipNextDeckListener) {
-                skipNextDeckListener = false
-                return@addSnapshotListener
-            }
-            if (snapshot != null) {
-                val fetchedDecks = snapshot.documents.mapNotNull { doc ->
-                    doc.toObject(Deck::class.java)?.copy(id = doc.id)
-                }
-                decks.clear()
-                decks.addAll(fetchedDecks)
-                saveDecksToLocal(fetchedDecks)
-            }
-        }
-    }
-
     private fun saveProfileToLocal(userId: String, profile: UserProfile) {
         val database = appDatabase ?: return
         val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
@@ -267,7 +221,6 @@ object Database {
                     val cardEntity = CardEntity.fromCard(card, deck.id)
                     database.cardDao().insertCard(cardEntity)
                 }
->>>>>>> master
             }
         }
     }
@@ -639,12 +592,24 @@ object Database {
                 if (card.id == updatedCard.id) updatedCard else card
             }
             val updatedDeck = deck.copy(cards = updatedCards)
-            // Always update local state first for immediate UI feedback
             decks[index] = updatedDeck
-            // Then sync to Firestore if online
+
             val userId = currentUserId
-            if (userId != null && !useOfflineMode) {
-                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+            if (userId != null) {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.updateCard(CardEntity.fromCard(updatedCard, deckId))
+                    } else {
+                        try {
+                            ApiClient.put<Card, Deck>("/users/$userId/decks/$deckId/cards/${updatedCard.id}", updatedCard)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                        syncManager?.updateCard(CardEntity.fromCard(updatedCard, deckId))
+                    }
+                    refreshWidget()
+                }
             }
         }
     }
@@ -658,17 +623,28 @@ object Database {
             val updatedCards = deck.cards.map { if (it.id == cardId) updatedCard else it }
             val updatedDeck = deck.copy(cards = updatedCards)
             decks[index] = updatedDeck
-            // Keep skip flag until next Firestore sync cycle completes
-            skipNextDeckListener = true
+
+            val userId = currentUserId
+            if (userId != null) {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.updateCard(CardEntity.fromCard(updatedCard, deckId))
+                    } else {
+                        try {
+                            ApiClient.put<Card, Deck>("/users/$userId/decks/$deckId/cards/$cardId", updatedCard)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                        syncManager?.updateCard(CardEntity.fromCard(updatedCard, deckId))
+                    }
+                }
+            }
         }
     }
 
     fun syncFavoritesToFirestore() {
-        val userId = currentUserId ?: return
-        skipNextDeckListener = false
-        for (deck in decks) {
-            db.collection("users").document(userId).collection("decks").document(deck.id).set(deck)
-        }
+        // No-op
     }
 
     fun getAllFavoriteCards(): List<Card> {
@@ -680,18 +656,23 @@ object Database {
         if (index != -1) {
             val deck = decks[index]
             val updatedDeck = deck.copy(tags = tags)
+            decks[index] = updatedDeck
+
             val userId = currentUserId
             if (userId != null) {
-                if (useOfflineMode) {
-                    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                    scope.launch {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+                    } else {
+                        try {
+                            ApiClient.put<Deck, Deck>("/users/$userId/decks/$deckId", updatedDeck)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                         syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
                     }
-                } else {
-                    db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
                 }
-            } else {
-                decks[index] = updatedDeck
             }
         }
     }
@@ -701,18 +682,23 @@ object Database {
         if (index != -1) {
             val deck = decks[index]
             val updatedDeck = deck.copy(masteredPercentage = mastery)
+            decks[index] = updatedDeck
+
             val userId = currentUserId
             if (userId != null) {
-                if (useOfflineMode) {
-                    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                    scope.launch {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+                    } else {
+                        try {
+                            ApiClient.put<Deck, Deck>("/users/$userId/decks/$deckId", updatedDeck)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                         syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
                     }
-                } else {
-                    db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
                 }
-            } else {
-                decks[index] = updatedDeck
             }
         }
     }

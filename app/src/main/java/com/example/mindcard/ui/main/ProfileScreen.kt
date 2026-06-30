@@ -421,6 +421,7 @@ fun BadgeItem(
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Box(
+            modifier = Modifier
                 .size(36.dp)
                 .clip(CircleShape)
                 .background(if (unlocked) Color(0xFFFFE083).copy(alpha = 0.3f) else Color(0xFFEAEAEA)),
