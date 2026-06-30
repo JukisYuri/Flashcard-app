@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
 import com.example.mindcard.Main
 import com.example.mindcard.data.Database
+import com.example.mindcard.data.ApiClient
+import com.example.mindcard.data.UserProfile
 import com.example.mindcard.ui.main.PrimaryIndigo
 
 data class LeaderboardEntry(
@@ -42,22 +44,58 @@ fun LeaderboardScreen(
     val currentUser = Database.userProfile.value
     val currentUserName = currentUser.name
 
-    // Generate leaderboard entries from local data + mock data
-    val leaderboard = remember {
-        val mockEntries = listOf(
-            LeaderboardEntry("Alex Chen", 2450, 8),
-            LeaderboardEntry("Sarah Kim", 2100, 7),
-            LeaderboardEntry("Mike Johnson", 1850, 6),
-            LeaderboardEntry("Emma Wilson", 1600, 5),
-            LeaderboardEntry("David Lee", 1400, 5),
-            LeaderboardEntry("Lisa Brown", 1200, 4),
-            LeaderboardEntry("James Taylor", 1000, 4),
-            LeaderboardEntry("Amy Garcia", 850, 3),
-            LeaderboardEntry("Chris Anderson", 700, 3),
-            LeaderboardEntry("Nina Martinez", 550, 2),
-        )
-        val userEntry = LeaderboardEntry(currentUserName, currentUser.totalXp, currentUser.level, true)
-        (mockEntries + userEntry).sortedByDescending { it.xp }.take(15)
+    var leaderboard by remember { mutableStateOf<List<LeaderboardEntry>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(currentUser) {
+        isLoading = true
+        try {
+            val serverProfiles = ApiClient.get<List<UserProfile>>("/users/leaderboard")
+            if (serverProfiles != null && serverProfiles.isNotEmpty()) {
+                val entries = serverProfiles.map { profile ->
+                    LeaderboardEntry(
+                        name = profile.name,
+                        xp = profile.totalXp,
+                        level = profile.level,
+                        isCurrentUser = profile.name == currentUserName
+                    )
+                }
+                leaderboard = entries.sortedByDescending { it.xp }.take(15)
+            } else {
+                val mockEntries = listOf(
+                    LeaderboardEntry("Alex Chen", 2450, 8),
+                    LeaderboardEntry("Sarah Kim", 2100, 7),
+                    LeaderboardEntry("Mike Johnson", 1850, 6),
+                    LeaderboardEntry("Emma Wilson", 1600, 5),
+                    LeaderboardEntry("David Lee", 1400, 5),
+                    LeaderboardEntry("Lisa Brown", 1200, 4),
+                    LeaderboardEntry("James Taylor", 1000, 4),
+                    LeaderboardEntry("Amy Garcia", 850, 3),
+                    LeaderboardEntry("Chris Anderson", 700, 3),
+                    LeaderboardEntry("Nina Martinez", 550, 2)
+                )
+                val userEntry = LeaderboardEntry(currentUserName, currentUser.totalXp, currentUser.level, true)
+                leaderboard = (mockEntries + userEntry).sortedByDescending { it.xp }.take(15)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            val mockEntries = listOf(
+                LeaderboardEntry("Alex Chen", 2450, 8),
+                LeaderboardEntry("Sarah Kim", 2100, 7),
+                LeaderboardEntry("Mike Johnson", 1850, 6),
+                LeaderboardEntry("Emma Wilson", 1600, 5),
+                LeaderboardEntry("David Lee", 1400, 5),
+                LeaderboardEntry("Lisa Brown", 1200, 4),
+                LeaderboardEntry("James Taylor", 1000, 4),
+                LeaderboardEntry("Amy Garcia", 850, 3),
+                LeaderboardEntry("Chris Anderson", 700, 3),
+                LeaderboardEntry("Nina Martinez", 550, 2)
+            )
+            val userEntry = LeaderboardEntry(currentUserName, currentUser.totalXp, currentUser.level, true)
+            leaderboard = (mockEntries + userEntry).sortedByDescending { it.xp }.take(15)
+        } finally {
+            isLoading = false
+        }
     }
 
     Scaffold(
@@ -74,55 +112,64 @@ fun LeaderboardScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Top 3 podium
-            if (leaderboard.size >= 3) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    // 2nd place
-                    PodiumItem(
-                        entry = leaderboard[1],
-                        medal = "🥈",
-                        height = 100.dp,
-                        gradient = listOf(Color(0xFFC0C0C0), Color(0xFFE8E8E8))
-                    )
-                    // 1st place
-                    PodiumItem(
-                        entry = leaderboard[0],
-                        medal = "🥇",
-                        height = 130.dp,
-                        gradient = listOf(Color(0xFFFFD700), Color(0xFFFFE082))
-                    )
-                    // 3rd place
-                    PodiumItem(
-                        entry = leaderboard[2],
-                        medal = "🥉",
-                        height = 80.dp,
-                        gradient = listOf(Color(0xFFCD7F32), Color(0xFFDEB887))
-                    )
-                }
-            }
-
-            // Remaining entries
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(1),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                contentAlignment = Alignment.Center
             ) {
-                items(leaderboard.drop(3).size) { index ->
-                    val entry = leaderboard.drop(3)[index]
-                    LeaderboardRow(
-                        rank = index + 4,
-                        entry = entry
-                    )
+                CircularProgressIndicator(color = PrimaryIndigo)
+            }
+        } else {
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Top 3 podium
+                if (leaderboard.size >= 3) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        // 2nd place
+                        PodiumItem(
+                            entry = leaderboard[1],
+                            medal = "🥈",
+                            height = 100.dp,
+                            gradient = listOf(Color(0xFFC0C0C0), Color(0xFFE8E8E8))
+                        )
+                        // 1st place
+                        PodiumItem(
+                            entry = leaderboard[0],
+                            medal = "🥇",
+                            height = 130.dp,
+                            gradient = listOf(Color(0xFFFFD700), Color(0xFFFFE082))
+                        )
+                        // 3rd place
+                        PodiumItem(
+                            entry = leaderboard[2],
+                            medal = "🥉",
+                            height = 80.dp,
+                            gradient = listOf(Color(0xFFCD7F32), Color(0xFFDEB887))
+                        )
+                    }
+                }
+
+                // Remaining entries
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(1),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(leaderboard.drop(3).size) { index ->
+                        val entry = leaderboard.drop(3)[index]
+                        LeaderboardRow(
+                            rank = index + 4,
+                            entry = entry
+                        )
+                    }
                 }
             }
         }

@@ -276,40 +276,6 @@ fun ProfileScreen(
             }
         }
 
-        // Settings / Reminders
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(24.dp))
-                .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
-                .padding(16.dp)
-        ) {
-            Text("Settings", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
-            Spacer(modifier = Modifier.height(12.dp))
-
-            val context = androidx.compose.ui.platform.LocalContext.current
-            var reminderEnabled by remember {
-                mutableStateOf(com.example.mindcard.util.ReminderManager.isReminderEnabled(context))
-            }
-
-            // Android 13+ Notification Permission Launcher
-            val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-                contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
-            ) { isGranted ->
-                if (isGranted) {
-                    com.example.mindcard.util.ReminderManager.scheduleDailyReminder(context)
-                    reminderEnabled = true
-                } else {
-                    reminderEnabled = false
-                    android.widget.Toast.makeText(
-                        context,
-                        "Notification permission denied. Cannot schedule reminder.",
-                        android.widget.Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-
-        }
 
         // Leaderboard Button
         Card(
