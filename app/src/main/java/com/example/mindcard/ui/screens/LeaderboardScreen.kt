@@ -60,39 +60,13 @@ fun LeaderboardScreen(
                         isCurrentUser = profile.name == currentUserName
                     )
                 }
-                leaderboard = entries.sortedByDescending { it.xp }.take(15)
+                leaderboard = entries.sortedByDescending { it.xp }
             } else {
-                val mockEntries = listOf(
-                    LeaderboardEntry("Alex Chen", 2450, 8),
-                    LeaderboardEntry("Sarah Kim", 2100, 7),
-                    LeaderboardEntry("Mike Johnson", 1850, 6),
-                    LeaderboardEntry("Emma Wilson", 1600, 5),
-                    LeaderboardEntry("David Lee", 1400, 5),
-                    LeaderboardEntry("Lisa Brown", 1200, 4),
-                    LeaderboardEntry("James Taylor", 1000, 4),
-                    LeaderboardEntry("Amy Garcia", 850, 3),
-                    LeaderboardEntry("Chris Anderson", 700, 3),
-                    LeaderboardEntry("Nina Martinez", 550, 2)
-                )
-                val userEntry = LeaderboardEntry(currentUserName, currentUser.totalXp, currentUser.level, true)
-                leaderboard = (mockEntries + userEntry).sortedByDescending { it.xp }.take(15)
+                leaderboard = listOf(LeaderboardEntry(currentUserName, currentUser.totalXp, currentUser.level, true))
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            val mockEntries = listOf(
-                LeaderboardEntry("Alex Chen", 2450, 8),
-                LeaderboardEntry("Sarah Kim", 2100, 7),
-                LeaderboardEntry("Mike Johnson", 1850, 6),
-                LeaderboardEntry("Emma Wilson", 1600, 5),
-                LeaderboardEntry("David Lee", 1400, 5),
-                LeaderboardEntry("Lisa Brown", 1200, 4),
-                LeaderboardEntry("James Taylor", 1000, 4),
-                LeaderboardEntry("Amy Garcia", 850, 3),
-                LeaderboardEntry("Chris Anderson", 700, 3),
-                LeaderboardEntry("Nina Martinez", 550, 2)
-            )
-            val userEntry = LeaderboardEntry(currentUserName, currentUser.totalXp, currentUser.level, true)
-            leaderboard = (mockEntries + userEntry).sortedByDescending { it.xp }.take(15)
+            leaderboard = listOf(LeaderboardEntry(currentUserName, currentUser.totalXp, currentUser.level, true))
         } finally {
             isLoading = false
         }
@@ -128,19 +102,24 @@ fun LeaderboardScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Top 3 podium
-                if (leaderboard.size >= 3) {
+                if (leaderboard.isNotEmpty()) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(160.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.Bottom
                     ) {
                         // 2nd place
-                        PodiumItem(
-                            entry = leaderboard[1],
-                            medal = "🥈",
-                            height = 100.dp,
-                            gradient = listOf(Color(0xFFC0C0C0), Color(0xFFE8E8E8))
-                        )
+                        if (leaderboard.size >= 2) {
+                            PodiumItem(
+                                entry = leaderboard[1],
+                                medal = "🥈",
+                                height = 100.dp,
+                                gradient = listOf(Color(0xFFC0C0C0), Color(0xFFE8E8E8))
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.width(80.dp))
+                        }
+
                         // 1st place
                         PodiumItem(
                             entry = leaderboard[0],
@@ -148,27 +127,34 @@ fun LeaderboardScreen(
                             height = 130.dp,
                             gradient = listOf(Color(0xFFFFD700), Color(0xFFFFE082))
                         )
+
                         // 3rd place
-                        PodiumItem(
-                            entry = leaderboard[2],
-                            medal = "🥉",
-                            height = 80.dp,
-                            gradient = listOf(Color(0xFFCD7F32), Color(0xFFDEB887))
-                        )
+                        if (leaderboard.size >= 3) {
+                            PodiumItem(
+                                entry = leaderboard[2],
+                                medal = "🥉",
+                                height = 80.dp,
+                                gradient = listOf(Color(0xFFCD7F32), Color(0xFFDEB887))
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.width(80.dp))
+                        }
                     }
                 }
 
                 // Remaining entries
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(1),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(leaderboard.drop(3).size) { index ->
-                        val entry = leaderboard.drop(3)[index]
-                        LeaderboardRow(
-                            rank = index + 4,
-                            entry = entry
-                        )
+                if (leaderboard.size > 3) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(1),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(leaderboard.drop(3).size) { index ->
+                            val entry = leaderboard.drop(3)[index]
+                            LeaderboardRow(
+                                rank = index + 4,
+                                entry = entry
+                            )
+                        }
                     }
                 }
             }
