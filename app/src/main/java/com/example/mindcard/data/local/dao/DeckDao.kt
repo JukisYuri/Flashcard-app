@@ -27,6 +27,9 @@ interface DeckDao {
     @Delete
     suspend fun deleteDeck(deck: DeckEntity)
 
+    @Query("SELECT * FROM decks WHERE isDeleted = 1")
+    suspend fun getSoftDeletedDecks(): List<DeckEntity>
+
     @Query("UPDATE decks SET isDeleted = 1, lastModified = :timestamp WHERE id = :deckId")
     suspend fun softDeleteDeck(deckId: String, timestamp: Long = System.currentTimeMillis())
 
