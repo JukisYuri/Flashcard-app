@@ -214,6 +214,12 @@ fun ProgressScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                 StatRow("Total XP", "${profile.totalXp}")
                 StatRow("Words Learned", "${profile.totalWordsLearned}")
+                
+                val overallMasteredPct = com.example.mindcard.data.Database.dailyRecord.value.mastered
+                val allCards = com.example.mindcard.data.Database.decks.flatMap { it.cards }
+                val masteredCardsCount = allCards.count { it.interval >= 21.0 || it.repetitions >= 3 }
+                StatRow("Mastered Cards", "$masteredCardsCount / ${allCards.size} ($overallMasteredPct%)")
+
                 StatRow("Level", "${profile.level}")
                 StatRow("Title", profile.title)
                 if (studiedDays > 0 && totalDays > 0) {

@@ -98,7 +98,8 @@ data class DailyStudyRecord(
     val dueCards: Int = 0,
     val wordsLearned: Int = 0,
     val xpEarned: Int = 0,
-    val timeSpentMin: Int = 0
+    val timeSpentMin: Int = 0,
+    val mastered: Int = 0
 )
 
 @SuppressLint("StaticFieldLeak")
@@ -106,6 +107,7 @@ object Database {
     val decks = mutableStateListOf<Deck>()
     val userProfile = mutableStateOf(UserProfile())
     val dailyRecord = mutableStateOf(DailyStudyRecord())
+    val dailyRecords = mutableStateListOf<DailyStudyRecord>()
 
     // Tracks cards studied in the current session
     var currentSessionAccuracy = 0
@@ -187,8 +189,10 @@ object Database {
                     val fetchedRecords = ApiClient.get<List<DailyStudyRecord>>("/users/$userId/daily-records")
                     if (fetchedRecords != null) {
                         val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                        val todayRec = fetchedRecords.find { it.date == todayStr } ?: DailyStudyRecord(userId = userId, date = todayStr, dueCards = decks.sumOf { com.example.mindcard.data.FsrsAlgorithm.getDueCardsCount(it.cards) })
+                        val todayRec = fetchedRecords.find { it.date == todayStr } ?: DailyStudyRecord(userId = userId, date = todayStr, dueCards = decks.sumOf { com.example.mindcard.data.FsrsAlgorithm.getDueCardsCount(it.cards) }, mastered = calculateMastered(decks.flatMap { it.cards }))
                         withContext(Dispatchers.Main) {
+                            dailyRecords.clear()
+                            dailyRecords.addAll(fetchedRecords)
                             dailyRecord.value = todayRec
                         }
                         saveDailyRecordsToLocal(userId, fetchedRecords)
@@ -217,18 +221,7 @@ object Database {
                 markTodayAsActive()
             }
 
-            // Load today's daily record
-            val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-            val recordEntity = database.dailyStudyRecordDao().getRecord(userId, todayStr)
-            withContext(Dispatchers.Main) {
-                if (recordEntity != null) {
-                    dailyRecord.value = recordEntity.toDailyStudyRecord()
-                } else {
-                    dailyRecord.value = DailyStudyRecord(userId = userId, date = todayStr, dueCards = decks.sumOf { com.example.mindcard.data.FsrsAlgorithm.getDueCardsCount(it.cards) })
-                }
-            }
-
-            // Load decks
+            // Load decks first to calculate due cards and mastery correctly
             val deckEntities = database.deckDao().getAllDecksSync()
             val loadedDecks = mutableListOf<Deck>()
 
@@ -241,6 +234,17 @@ object Database {
             withContext(Dispatchers.Main) {
                 decks.clear()
                 decks.addAll(loadedDecks)
+            }
+
+            // Load today's daily record and all daily records
+            val allRecordsEntities = database.dailyStudyRecordDao().getAllRecordsSync(userId)
+            val allRecords = allRecordsEntities.map { it.toDailyStudyRecord().copy(userId = it.userId, date = it.date) }
+            val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val todayRec = allRecords.find { it.date == todayStr } ?: DailyStudyRecord(userId = userId, date = todayStr, dueCards = loadedDecks.sumOf { com.example.mindcard.data.FsrsAlgorithm.getDueCardsCount(it.cards) }, mastered = calculateMastered(loadedDecks.flatMap { it.cards }))
+            withContext(Dispatchers.Main) {
+                dailyRecords.clear()
+                dailyRecords.addAll(allRecords)
+                dailyRecord.value = todayRec
             }
         }
     }
@@ -268,7 +272,8 @@ object Database {
                         dueCards = record.dueCards,
                         wordsLearned = record.wordsLearned,
                         xpEarned = record.xpEarned,
-                        timeSpentMin = record.timeSpentMin
+                        timeSpentMin = record.timeSpentMin,
+                        mastered = record.mastered
                     )
                 )
             }
@@ -626,15 +631,24 @@ object Database {
         // Optimistic Daily Record Update
         val currentRecord = dailyRecord.value
         val newDue = decks.sumOf { com.example.mindcard.data.FsrsAlgorithm.getDueCardsCount(it.cards) }
+        val newMastered = calculateMastered(decks.flatMap { it.cards })
         val updatedRecord = currentRecord.copy(
             userId = userId ?: "",
             date = todayStr,
             dueCards = newDue,
             wordsLearned = currentRecord.wordsLearned + cardsReviewed,
             xpEarned = currentRecord.xpEarned + xp,
-            timeSpentMin = currentRecord.timeSpentMin + timeMin
+            timeSpentMin = currentRecord.timeSpentMin + timeMin,
+            mastered = newMastered
         )
         dailyRecord.value = updatedRecord
+
+        val recordIdx = dailyRecords.indexOfFirst { it.date == todayStr }
+        if (recordIdx != -1) {
+            dailyRecords[recordIdx] = updatedRecord
+        } else {
+            dailyRecords.add(updatedRecord)
+        }
 
         val deckIndex = decks.indexOfFirst { it.id == deckId }
         val updatedDeck = if (deckIndex != -1) {
@@ -660,7 +674,8 @@ object Database {
                             dueCards = updatedRecord.dueCards,
                             wordsLearned = updatedRecord.wordsLearned,
                             xpEarned = updatedRecord.xpEarned,
-                            timeSpentMin = updatedRecord.timeSpentMin
+                            timeSpentMin = updatedRecord.timeSpentMin,
+                            mastered = updatedRecord.mastered
                         )
                     )
 
@@ -1059,13 +1074,44 @@ object Database {
                             dueCards = r.dueCards,
                             wordsLearned = r.wordsLearned,
                             xpEarned = r.xpEarned,
-                            timeSpentMin = r.timeSpentMin
+                            timeSpentMin = r.timeSpentMin,
+                            mastered = r.mastered
                         )
                     )
                 }
 
-                val todayRec = freshRecords.find { it.date == todayStr } ?: DailyStudyRecord(userId = userId, date = todayStr, dueCards = decks.sumOf { com.example.mindcard.data.FsrsAlgorithm.getDueCardsCount(it.cards) })
+                // Recalculate actual dueCards and mastered percentage from fresh decks/cards for today's record!
+                val actualDue = decks.sumOf { com.example.mindcard.data.FsrsAlgorithm.getDueCardsCount(it.cards) }
+                val actualMastered = calculateMastered(decks.flatMap { it.cards })
+
+                val serverTodayRec = freshRecords.find { it.date == todayStr }
+                val todayRec = (serverTodayRec ?: DailyStudyRecord(userId = userId, date = todayStr)).copy(
+                    dueCards = actualDue,
+                    mastered = actualMastered
+                )
+
+                // Save this updated record back to Room & Server so it is persistent!
+                dbInstance.dailyStudyRecordDao().insertRecord(
+                    DailyStudyRecordEntity(
+                        userId = userId,
+                        date = todayStr,
+                        dueCards = todayRec.dueCards,
+                        wordsLearned = todayRec.wordsLearned,
+                        xpEarned = todayRec.xpEarned,
+                        timeSpentMin = todayRec.timeSpentMin,
+                        mastered = todayRec.mastered
+                    )
+                )
+                ApiClient.put<DailyStudyRecord, DailyStudyRecord>("/users/$userId/daily-records/$todayStr", todayRec)
+
+                // Update client list
+                val updatedRecords = freshRecords.map {
+                    if (it.date == todayStr) todayRec else it
+                }
+
                 withContext(Dispatchers.Main) {
+                    dailyRecords.clear()
+                    dailyRecords.addAll(updatedRecords)
                     dailyRecord.value = todayRec
                 }
             }

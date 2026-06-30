@@ -11,14 +11,18 @@ data class DailyStudyRecordEntity(
     val wordsLearned: Int,
     val xpEarned: Int,
     val timeSpentMin: Int,
+    val mastered: Int,
     val lastModified: Long = System.currentTimeMillis()
 ) {
     fun toDailyStudyRecord(): DailyStudyRecord {
         return DailyStudyRecord(
+            userId = userId,
+            date = date,
             dueCards = dueCards,
             wordsLearned = wordsLearned,
             xpEarned = xpEarned,
-            timeSpentMin = timeSpentMin
+            timeSpentMin = timeSpentMin,
+            mastered = mastered
         )
     }
 
@@ -30,7 +34,8 @@ data class DailyStudyRecordEntity(
                 dueCards = record.dueCards,
                 wordsLearned = record.wordsLearned,
                 xpEarned = record.xpEarned,
-                timeSpentMin = record.timeSpentMin
+                timeSpentMin = record.timeSpentMin,
+                mastered = record.mastered
             )
         }
     }

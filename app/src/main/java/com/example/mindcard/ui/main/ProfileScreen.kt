@@ -309,39 +309,6 @@ fun ProfileScreen(
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Daily Study Reminder", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
-                    Text("Get notified daily at 20:00 to keep up your streak", fontSize = 11.sp, color = OutlineColor)
-                }
-                Switch(
-                    checked = reminderEnabled,
-                    onCheckedChange = { checked ->
-                        if (checked) {
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                                // Request permission on Android 13+
-                                permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                            } else {
-                                com.example.mindcard.util.ReminderManager.scheduleDailyReminder(context)
-                                reminderEnabled = true
-                            }
-                        } else {
-                            com.example.mindcard.util.ReminderManager.cancelDailyReminder(context)
-                            reminderEnabled = false
-                        }
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = PrimaryIndigo,
-                        uncheckedThumbColor = OutlineColor,
-                        uncheckedTrackColor = Color(0xFFF2F4F6)
-                    )
-                )
-            }
         }
 
         // Leaderboard Button
