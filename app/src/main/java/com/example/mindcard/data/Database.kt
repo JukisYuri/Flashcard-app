@@ -549,38 +549,50 @@ object Database {
             studyHistory = updatedHistory
         )
         userProfile.value = updatedProfile
-        // Update deck mastery progress slightly
+        val userId = currentUserId
         val deckIndex = decks.indexOfFirst { it.id == deckId }
-        if (deckIndex != -1) {
+        val updatedDeck = if (deckIndex != -1) {
             val deck = decks[deckIndex]
             val newMastery = minOf(100, deck.masteredPercentage + (accuracy / 10))
-            val updatedDeck = deck.copy(masteredPercentage = newMastery)
-            decks[deckIndex] = updatedDeck
+            val ud = deck.copy(masteredPercentage = newMastery)
+            decks[deckIndex] = ud
+            ud
+        } else {
+            null
+        }
 
-            val userId = currentUserId
-            if (userId != null) {
-                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                scope.launch {
+        if (userId != null) {
+            val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+            scope.launch {
+                try {
                     if (useOfflineMode) {
-                        syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+                        if (updatedDeck != null) {
+                            syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+                        }
                         syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(updatedProfile, userId))
                     } else {
                         // Asynchronous server sync
-                        try {
-                            val req = StudySessionRequest(deckId, accuracy, xp, timeMin)
-                            val respProfile = ApiClient.post<StudySessionRequest, UserProfile>("/users/$userId/decks/study-session", req)
-                            if (respProfile != null) {
-                                withContext(Dispatchers.Main) {
-                                    userProfile.value = respProfile
-                                }
-                                syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(respProfile, userId))
+                        val req = StudySessionRequest(deckId, accuracy, xp, timeMin)
+                        val respProfile = ApiClient.post<StudySessionRequest, UserProfile>("/users/$userId/decks/study-session", req)
+                        if (respProfile != null) {
+                            withContext(Dispatchers.Main) {
+                                userProfile.value = respProfile
                             }
-                        } catch (e: Exception) {
-                            e.printStackTrace()
+                            syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(respProfile, userId))
+                        } else {
+                            // Fallback to local profile save if server is unreachable
+                            syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(updatedProfile, userId))
                         }
-                        syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+
+                        if (updatedDeck != null) {
+                            syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+                        }
                     }
                     refreshWidget()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    // Fallback to local profile save on error
+                    syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(updatedProfile, userId))
                 }
             }
         }

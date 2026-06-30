@@ -10,6 +10,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +52,8 @@ fun MainScreen(
     val dueCount = viewModel.getTotalDueCards()
 
     val lifecycleOwner = LocalLifecycleOwner.current
+    val coroutineScope = rememberCoroutineScope()
+    var isRefreshing by remember { mutableStateOf(false) }
 
 
     Scaffold(
@@ -198,21 +202,31 @@ fun MainScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                coroutineScope.launch {
+                    Database.syncNowSuspend()
+                    isRefreshing = false
+                }
+            },
+            modifier = Modifier.fillMaxSize().padding(innerPadding)
         ) {
-            when (activeTab) {
-                ActiveTab.Home -> HomeScreen(onItemClick = onItemClick, viewModel = viewModel)
-                ActiveTab.Lesson -> LessonScreen(onItemClick = onItemClick, viewModel = viewModel)
-                ActiveTab.Library -> LibraryScreen()
-                ActiveTab.Progress -> ProgressScreen()
-                ActiveTab.Profile -> ProfileScreen(
-                    onLogoutClick = { onItemClick(Login) },
-                    onSettingsClick = { onItemClick(Settings) },
-                    onLeaderboardClick = { onItemClick(Leaderboard) }
-                )
+            Box(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                when (activeTab) {
+                    ActiveTab.Home -> HomeScreen(onItemClick = onItemClick, viewModel = viewModel)
+                    ActiveTab.Lesson -> LessonScreen(onItemClick = onItemClick, viewModel = viewModel)
+                    ActiveTab.Library -> LibraryScreen()
+                    ActiveTab.Progress -> ProgressScreen()
+                    ActiveTab.Profile -> ProfileScreen(
+                        onLogoutClick = { onItemClick(Login) },
+                        onSettingsClick = { onItemClick(Settings) },
+                        onLeaderboardClick = { onItemClick(Leaderboard) }
+                    )
+                }
             }
         }
     }

@@ -60,28 +60,14 @@ fun HomeScreen(
     val totalDueCards = viewModel.getTotalDueCards()
     var deckToDelete by remember { mutableStateOf<Deck?>(null) }
 
-    val coroutineScope = rememberCoroutineScope()
-    var isRefreshing by remember { mutableStateOf(false) }
-
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            coroutineScope.launch {
-                com.example.mindcard.data.Database.syncNowSuspend()
-                isRefreshing = false
-            }
-        },
-        modifier = modifier.fillMaxSize()
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(scrollState)
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .verticalScroll(scrollState)
-                .padding(horizontal = 20.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(28.dp)
-        ) {
         Text(
             text = "Daily Goals",
             fontSize = 22.sp,
@@ -255,7 +241,6 @@ fun HomeScreen(
         }
     }
     Spacer(modifier = Modifier.height(80.dp))
-    }
     }
 
     if (deckToDelete != null) {
