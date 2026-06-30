@@ -11,6 +11,7 @@ import com.example.mindcard.data.local.AppDatabase
 import com.example.mindcard.data.local.entity.CardEntity
 import com.example.mindcard.data.local.entity.DeckEntity
 import com.example.mindcard.data.local.entity.UserProfileEntity
+import com.example.mindcard.data.local.entity.DailyStudyRecordEntity
 import com.example.mindcard.data.sync.SyncManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -90,10 +91,21 @@ data class UserProfile(
     val studyHistory: Map<String, Boolean> = emptyMap() // "YYYY-MM-DD" -> true
 )
 
+@Serializable
+data class DailyStudyRecord(
+    val userId: String = "",
+    val date: String = "",
+    val dueCards: Int = 0,
+    val wordsLearned: Int = 0,
+    val xpEarned: Int = 0,
+    val timeSpentMin: Int = 0
+)
+
 @SuppressLint("StaticFieldLeak")
 object Database {
     val decks = mutableStateListOf<Deck>()
     val userProfile = mutableStateOf(UserProfile())
+    val dailyRecord = mutableStateOf(DailyStudyRecord())
 
     // Tracks cards studied in the current session
     var currentSessionAccuracy = 0
@@ -172,6 +184,15 @@ object Database {
                         }
                         saveDecksToLocal(fetchedDecks)
                     }
+                    val fetchedRecords = ApiClient.get<List<DailyStudyRecord>>("/users/$userId/daily-records")
+                    if (fetchedRecords != null) {
+                        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                        val todayRec = fetchedRecords.find { it.date == todayStr } ?: DailyStudyRecord(userId = userId, date = todayStr, dueCards = decks.sumOf { com.example.mindcard.data.FsrsAlgorithm.getDueCardsCount(it.cards) })
+                        withContext(Dispatchers.Main) {
+                            dailyRecord.value = todayRec
+                        }
+                        saveDailyRecordsToLocal(userId, fetchedRecords)
+                    }
                 } catch (e: Exception) {
                     e.printStackTrace()
                     // Fallback to local Room database on connection error
@@ -194,6 +215,17 @@ object Database {
                 }
                 isLoaded = true
                 markTodayAsActive()
+            }
+
+            // Load today's daily record
+            val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val recordEntity = database.dailyStudyRecordDao().getRecord(userId, todayStr)
+            withContext(Dispatchers.Main) {
+                if (recordEntity != null) {
+                    dailyRecord.value = recordEntity.toDailyStudyRecord()
+                } else {
+                    dailyRecord.value = DailyStudyRecord(userId = userId, date = todayStr, dueCards = decks.sumOf { com.example.mindcard.data.FsrsAlgorithm.getDueCardsCount(it.cards) })
+                }
             }
 
             // Load decks
@@ -220,6 +252,26 @@ object Database {
         scope.launch {
             val entity = UserProfileEntity.fromUserProfile(profile, userId)
             database.userProfileDao().insertUserProfile(entity)
+        }
+    }
+
+    private fun saveDailyRecordsToLocal(userId: String, recordsList: List<DailyStudyRecord>) {
+        val database = appDatabase ?: return
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+
+        scope.launch {
+            for (record in recordsList) {
+                database.dailyStudyRecordDao().insertRecord(
+                    DailyStudyRecordEntity(
+                        userId = userId,
+                        date = record.date,
+                        dueCards = record.dueCards,
+                        wordsLearned = record.wordsLearned,
+                        xpEarned = record.xpEarned,
+                        timeSpentMin = record.timeSpentMin
+                    )
+                )
+            }
         }
     }
 
@@ -537,7 +589,7 @@ object Database {
         updateUserProfile(updatedProfile)
     }
 
-    fun recordStudySession(deckId: String, accuracy: Int, xp: Int, timeMin: Int) {
+    fun recordStudySession(deckId: String, accuracy: Int, xp: Int, timeMin: Int, cardsReviewed: Int = 1) {
         currentSessionAccuracy = accuracy
         currentSessionXp = xp
         currentSessionTime = timeMin
@@ -568,7 +620,22 @@ object Database {
             studyHistory = updatedHistory
         )
         userProfile.value = updatedProfile
+
         val userId = currentUserId
+
+        // Optimistic Daily Record Update
+        val currentRecord = dailyRecord.value
+        val newDue = decks.sumOf { com.example.mindcard.data.FsrsAlgorithm.getDueCardsCount(it.cards) }
+        val updatedRecord = currentRecord.copy(
+            userId = userId ?: "",
+            date = todayStr,
+            dueCards = newDue,
+            wordsLearned = currentRecord.wordsLearned + cardsReviewed,
+            xpEarned = currentRecord.xpEarned + xp,
+            timeSpentMin = currentRecord.timeSpentMin + timeMin
+        )
+        dailyRecord.value = updatedRecord
+
         val deckIndex = decks.indexOfFirst { it.id == deckId }
         val updatedDeck = if (deckIndex != -1) {
             val deck = decks[deckIndex]
@@ -584,13 +651,26 @@ object Database {
             val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
             scope.launch {
                 try {
+                    // 1. Update Room DB DailyStudyRecord
+                    val dbInstance = appDatabase ?: return@launch
+                    dbInstance.dailyStudyRecordDao().insertRecord(
+                        DailyStudyRecordEntity(
+                            userId = userId,
+                            date = todayStr,
+                            dueCards = updatedRecord.dueCards,
+                            wordsLearned = updatedRecord.wordsLearned,
+                            xpEarned = updatedRecord.xpEarned,
+                            timeSpentMin = updatedRecord.timeSpentMin
+                        )
+                    )
+
                     if (useOfflineMode) {
                         if (updatedDeck != null) {
                             syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
                         }
                         syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(updatedProfile, userId))
                     } else {
-                        // Asynchronous server sync
+                        // Asynchronous server sync for profile
                         val req = StudySessionRequest(deckId, accuracy, xp, timeMin)
                         val respProfile = ApiClient.post<StudySessionRequest, UserProfile>("/users/$userId/decks/study-session", req)
                         if (respProfile != null) {
@@ -599,18 +679,19 @@ object Database {
                             }
                             syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(respProfile, userId))
                         } else {
-                            // Fallback to local profile save if server is unreachable
                             syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(updatedProfile, userId))
                         }
 
                         if (updatedDeck != null) {
                             syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
                         }
+
+                        // Sync DailyStudyRecord to Server
+                        ApiClient.put<DailyStudyRecord, DailyStudyRecord>("/users/$userId/daily-records/$todayStr", updatedRecord)
                     }
                     refreshWidget()
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    // Fallback to local profile save on error
                     syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(updatedProfile, userId))
                 }
             }
@@ -872,6 +953,11 @@ object Database {
             val localProfile = userProfile.value
             ApiClient.put<UserProfile, UserProfile>("/users/$userId", localProfile)
 
+            // 1b. Sync local daily record to server
+            val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val localRecord = dailyRecord.value
+            ApiClient.put<DailyStudyRecord, DailyStudyRecord>("/users/$userId/daily-records/$todayStr", localRecord)
+
             // 2. Fetch server decks
             val serverDecks = ApiClient.get<List<Deck>>("/users/$userId/decks") ?: emptyList()
             val serverDecksMap = serverDecks.associateBy { it.id }
@@ -952,6 +1038,35 @@ object Database {
                 dbInstance.userProfileDao().insertUserProfile(com.example.mindcard.data.local.entity.UserProfileEntity.fromUserProfile(freshProfile, userId))
                 withContext(Dispatchers.Main) {
                     userProfile.value = freshProfile
+                }
+            }
+
+            // 6b. Fetch fresh daily records from Server and update Room cache
+            val freshRecords = ApiClient.get<List<DailyStudyRecord>>("/users/$userId/daily-records")
+            if (freshRecords != null) {
+                // Clear Room database daily records
+                val oldRecords = dbInstance.dailyStudyRecordDao().getAllRecordsSync(userId)
+                for (or in oldRecords) {
+                    dbInstance.dailyStudyRecordDao().deleteRecord(userId, or.date)
+                }
+
+                // Write fresh records to Room
+                for (r in freshRecords) {
+                    dbInstance.dailyStudyRecordDao().insertRecord(
+                        DailyStudyRecordEntity(
+                            userId = userId,
+                            date = r.date,
+                            dueCards = r.dueCards,
+                            wordsLearned = r.wordsLearned,
+                            xpEarned = r.xpEarned,
+                            timeSpentMin = r.timeSpentMin
+                        )
+                    )
+                }
+
+                val todayRec = freshRecords.find { it.date == todayStr } ?: DailyStudyRecord(userId = userId, date = todayStr, dueCards = decks.sumOf { com.example.mindcard.data.FsrsAlgorithm.getDueCardsCount(it.cards) })
+                withContext(Dispatchers.Main) {
+                    dailyRecord.value = todayRec
                 }
             }
 

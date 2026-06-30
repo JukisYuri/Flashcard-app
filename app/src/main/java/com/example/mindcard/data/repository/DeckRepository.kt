@@ -54,8 +54,8 @@ class DeckRepository {
         )
     }
 
-    fun recordStudySession(deckId: String, accuracy: Int, xp: Int, timeMinutes: Int) {
-        Database.recordStudySession(deckId, accuracy, xp, timeMinutes)
+    fun recordStudySession(deckId: String, accuracy: Int, xp: Int, timeMinutes: Int, cardsReviewed: Int = 1) {
+        Database.recordStudySession(deckId, accuracy, xp, timeMinutes, cardsReviewed)
     }
 
     fun updateCardState(deckId: String, updatedCard: Card) {

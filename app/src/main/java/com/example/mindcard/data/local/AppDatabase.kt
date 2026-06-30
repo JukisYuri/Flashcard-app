@@ -7,23 +7,27 @@ import androidx.room.RoomDatabase
 import com.example.mindcard.data.local.dao.CardDao
 import com.example.mindcard.data.local.dao.DeckDao
 import com.example.mindcard.data.local.dao.UserProfileDao
+import com.example.mindcard.data.local.dao.DailyStudyRecordDao
 import com.example.mindcard.data.local.entity.CardEntity
 import com.example.mindcard.data.local.entity.DeckEntity
 import com.example.mindcard.data.local.entity.UserProfileEntity
+import com.example.mindcard.data.local.entity.DailyStudyRecordEntity
 
 @Database(
     entities = [
         CardEntity::class,
         DeckEntity::class,
-        UserProfileEntity::class
+        UserProfileEntity::class,
+        DailyStudyRecordEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun cardDao(): CardDao
     abstract fun deckDao(): DeckDao
     abstract fun userProfileDao(): UserProfileDao
+    abstract fun dailyStudyRecordDao(): DailyStudyRecordDao
 
     companion object {
         @Volatile

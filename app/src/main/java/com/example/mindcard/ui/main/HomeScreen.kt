@@ -56,6 +56,7 @@ fun HomeScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val userProfile by viewModel.userProfile
+    val dailyRecord by viewModel.dailyRecord
     val decks = viewModel.decks
     val totalDueCards = viewModel.getTotalDueCards()
     var deckToDelete by remember { mutableStateOf<Deck?>(null) }
@@ -88,7 +89,7 @@ fun HomeScreen(
                 isTimer = false
             )
 
-            val wordsLearned = userProfile.totalWordsLearned
+            val wordsLearned = dailyRecord.wordsLearned
             val wordsGoal = 30
             val progressWords = if (wordsGoal > 0) minOf(1f, wordsLearned.toFloat() / wordsGoal) else 0f
 
@@ -101,9 +102,9 @@ fun HomeScreen(
                 isTimer = false
             )
 
-            val timeSpent = viewModel.currentSessionTime
+            val timeSpent = dailyRecord.timeSpentMin
             val timeGoal = 15f
-            val progressTime = if (timeSpent > 0) minOf(1f, timeSpent / timeGoal) else 0f
+            val progressTime = if (timeSpent > 0) minOf(1f, timeSpent.toFloat() / timeGoal) else 0f
 
             GoalCardCircular(
                 title = "TIME SPENT",

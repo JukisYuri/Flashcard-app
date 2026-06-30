@@ -323,7 +323,7 @@ fun MainScreen(
             onFinish = { accuracy, xp, cardsReviewed ->
                 viewModel.onReviewGateFinished(accuracy, xp, cardsReviewed)
                 if (cardsReviewed > 0) {
-                    Database.recordStudySession("quick_review", accuracy, xp, 1)
+                    Database.recordStudySession("quick_review", accuracy, xp, 1, cardsReviewed)
                 } else {
                     Database.markTodayAsActive()
                 }

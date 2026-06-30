@@ -102,7 +102,7 @@ class StudyViewModel : ViewModel() {
                 val newMastery = FsrsAlgorithm.calculateMastery(deck.cards)
                 deckRepository.updateDeckMastery(deck.id, newMastery)
 
-                deckRepository.recordStudySession(deck.id, accuracy, xpEarned, 1)
+                deckRepository.recordStudySession(deck.id, accuracy, xpEarned, 1, totalRated)
                 onFinished(accuracy, xpEarned)
             }
         }

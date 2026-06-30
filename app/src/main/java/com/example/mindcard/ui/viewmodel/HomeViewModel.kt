@@ -23,6 +23,7 @@ class HomeViewModel : ViewModel() {
     private val deckRepository = DeckRepository()
 
     val userProfile: State<UserProfile> = userRepository.userProfile
+    val dailyRecord: State<com.example.mindcard.data.DailyStudyRecord> = com.example.mindcard.data.Database.dailyRecord
     val decks: SnapshotStateList<Deck> = deckRepository.decks
     val currentSessionTime: Int get() = com.example.mindcard.data.Database.currentSessionTime
 
