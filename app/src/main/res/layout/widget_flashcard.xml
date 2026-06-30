@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_card"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/widget_pos"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="#E8E5FF"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="4dp"
+        android:text="Noun"
+        android:textColor="#6C63FF"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widget_word"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Hello"
+        android:textColor="#1A1C2E"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:gravity="center" />
+
+    <TextView
+        android:id="@+id/widget_pronunciation"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="/həˈloʊ/"
+        android:textColor="#6B7280"
+        android:textSize="12sp"
+        android:textStyle="italic"
+        android:gravity="center" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginVertical="4dp"
+        android:text="───────────"
+        android:textColor="#E5E7EB"
+        android:textSize="10sp"
+        android:gravity="center" />
+
+    <TextView
+        android:id="@+id/widget_definition"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Used as a greeting."
+        android:textColor="#374151"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:maxLines="3"
+        android:ellipsize="end" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="MindCard"
+        android:textColor="#6C63FF"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+</LinearLayout>

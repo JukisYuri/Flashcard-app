@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Mind Card</string>
+    <string name="widget_description">A flashcard widget that shows random vocabulary words from your collection.</string>
 </resources>

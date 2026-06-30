@@ -11,18 +11,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
 import com.example.mindcard.CreateCard
 import com.example.mindcard.CreateDeck
 import com.example.mindcard.FlashcardStudy
-import com.example.mindcard.data.Database
 import com.example.mindcard.data.Deck
-import com.example.mindcard.ui.screens.*
+import com.example.mindcard.data.FsrsAlgorithm
 
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mindcard.ui.viewmodel.HomeViewModel
@@ -38,10 +38,11 @@ fun LessonScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Select Lesson", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = Color(0xFF191C1E))
+        Text("Select Lesson", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
 
         if (decks.isEmpty()) {
             EmptyStateCard(
@@ -74,22 +75,20 @@ fun LessonScreen(
                                     onLongClick = {
                                         showMenu = true
                                     }
-                                ),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                                )
+                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             shape = RoundedCornerShape(16.dp)
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                                    .padding(16.dp),
+                                modifier = Modifier.padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .size(44.dp)
-                                        .background(SecondaryGreen.copy(alpha = 0.1f), RoundedCornerShape(10.dp)),
+                                        .background(SecondaryGreen.copy(alpha = 0.15f), RoundedCornerShape(10.dp)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
@@ -100,13 +99,19 @@ fun LessonScreen(
                                     )
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(deck.name, fontSize = 16.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = Color(0xFF191C1E))
-                                    Text("${deck.cards.size} Cards", fontSize = 12.sp, color = OutlineColor)
+                                    Text(deck.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("${deck.cards.size} Cards", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        val dueCount = FsrsAlgorithm.getDueCardsCount(deck.cards)
+                                        if (dueCount > 0) {
+                                            Text("$dueCount due", fontSize = 12.sp, color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
                                 if (deck.cards.isEmpty()) {
-                                    Text("Add Cards", color = PrimaryIndigo, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 13.sp)
+                                    Text("Add Cards", color = PrimaryIndigo, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 } else {
-                                    Text("${deck.masteredPercentage}% Mastery", color = SecondaryGreen, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 13.sp)
+                                    Text("${deck.masteredPercentage}% Mastery", color = SecondaryGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
                             }
                         }

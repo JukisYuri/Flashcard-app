@@ -8,17 +8,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import com.example.mindcard.CreateAI
@@ -41,6 +44,7 @@ fun CreateDeckScreen(
     modifier: Modifier = Modifier,
     viewModel: CreateDeckViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val existingDeck = remember(deckId, Database.decks) {
         if (deckId != null) Database.decks.firstOrNull { it.id == deckId } else null
     }
@@ -80,20 +84,29 @@ fun CreateDeckScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // AI Generator shortcut button (Hide if editing existing deck)
+            // AI Generator + Import buttons (Hide if editing existing deck)
             if (existingDeck == null) {
-                Button(
-                    onClick = { onNavigate(CreateAI) },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
-                    shape = RoundedCornerShape(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.padding(vertical = 4.dp)
+                    Button(
+                        onClick = { onNavigate(CreateAI) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("✨  Generate with AI", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("✨ AI", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = { viewModel.showImportDialog = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Import CSV", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -149,6 +162,16 @@ fun CreateDeckScreen(
                         }
                     }
                 }
+
+                // Tags input
+                OutlinedTextField(
+                    value = viewModel.tags,
+                    onValueChange = { viewModel.tags = it },
+                    label = { Text("Tags (comma separated)") },
+                    placeholder = { Text("e.g. important, review, beginner") },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             // Cards in this Deck list (Only visible in Edit mode)
@@ -251,6 +274,17 @@ fun CreateDeckScreen(
                 }
 
                 if (existingDeck != null) {
+                    // Export CSV button
+                    OutlinedButton(
+                        onClick = { viewModel.exportToCSV(existingDeck, context) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Export as CSV", fontWeight = FontWeight.Bold)
+                    }
+
                     Button(
                         onClick = { viewModel.showDeleteConfirm = true },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFDAD6)),
@@ -499,6 +533,47 @@ fun CreateDeckScreen(
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.showCardDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Import CSV Dialog
+    if (viewModel.showImportDialog) {
+        val importLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument()
+        ) { uri ->
+            uri?.let {
+                viewModel.importFromCSV(it, context) {
+                    viewModel.showImportDialog = false
+                    onNavigate(Main)
+                }
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { viewModel.showImportDialog = false },
+            title = { Text("Import CSV", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Select a CSV file with columns:", fontSize = 14.sp)
+                    Text("englishWord, pronunciation, pos, definition, exampleSentence, synonyms", fontSize = 12.sp, color = OutlineColor, fontStyle = FontStyle.Italic)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { importLauncher.launch(arrayOf("text/csv", "text/*")) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.FileDownload, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Choose CSV File", fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.showImportDialog = false }) {
                     Text("Cancel")
                 }
             }
