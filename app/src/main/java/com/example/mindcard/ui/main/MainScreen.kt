@@ -49,22 +49,8 @@ fun MainScreen(
 
     val dueCount = viewModel.getTotalDueCards()
 
-    LaunchedEffect(dueCount) {
-        if (dueCount > 0 && !viewModel.showReviewGate) {
-            viewModel.showReviewGate = true
-        }
-    }
-
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.openReviewGate()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
+
 
     Scaffold(
         topBar = {
