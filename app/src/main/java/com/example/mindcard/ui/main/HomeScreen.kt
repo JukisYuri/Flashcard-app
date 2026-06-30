@@ -34,6 +34,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mindcard.data.sync.SyncManager
 import com.example.mindcard.ui.viewmodel.HomeViewModel
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 val PrimaryIndigo = Color(0xFF6C63FF)
 val SecondaryGreen = Color(0xFF00D68F)
@@ -43,6 +46,7 @@ val BackgroundFrost = Color(0xFFF8F9FE)
 val OutlineColor = Color(0xFF6B7280)
 val OutlineVariantColor = Color(0xFFE5E7EB)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onItemClick: (NavKey) -> Unit,
@@ -56,14 +60,28 @@ fun HomeScreen(
     val totalDueCards = viewModel.getTotalDueCards()
     var deckToDelete by remember { mutableStateOf<Deck?>(null) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(scrollState)
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
+    val coroutineScope = rememberCoroutineScope()
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            coroutineScope.launch {
+                com.example.mindcard.data.Database.syncNowSuspend()
+                isRefreshing = false
+            }
+        },
+        modifier = modifier.fillMaxSize()
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(28.dp)
+        ) {
         Text(
             text = "Daily Goals",
             fontSize = 22.sp,
@@ -237,6 +255,7 @@ fun HomeScreen(
         }
     }
     Spacer(modifier = Modifier.height(80.dp))
+    }
     }
 
     if (deckToDelete != null) {

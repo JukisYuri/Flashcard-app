@@ -822,101 +822,107 @@ object Database {
         if (userId != null && !useOfflineMode) {
             val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
             scope.launch {
-                try {
-                    val dbInstance = appDatabase ?: return@launch
+                syncNowSuspend()
+            }
+        }
+    }
 
-                    // 1. Sync local profile updates to server
-                    val localProfile = userProfile.value
-                    ApiClient.put<UserProfile, UserProfile>("/users/$userId", localProfile)
+    suspend fun syncNowSuspend() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val userId = currentUserId ?: return@withContext
+        if (useOfflineMode) return@withContext
+        try {
+            val dbInstance = appDatabase ?: return@withContext
 
-                    // 2. Fetch server decks
-                    val serverDecks = ApiClient.get<List<Deck>>("/users/$userId/decks") ?: emptyList()
-                    val serverDecksMap = serverDecks.associateBy { it.id }
+            // 1. Sync local profile updates to server
+            val localProfile = userProfile.value
+            ApiClient.put<UserProfile, UserProfile>("/users/$userId", localProfile)
 
-                    // 3. Process local soft-deleted decks
-                    val deletedDecks = dbInstance.deckDao().getSoftDeletedDecks()
-                    for (delDeck in deletedDecks) {
-                        ApiClient.delete("/users/$userId/decks/${delDeck.id}")
-                        dbInstance.deckDao().deleteDeck(delDeck)
-                    }
+            // 2. Fetch server decks
+            val serverDecks = ApiClient.get<List<Deck>>("/users/$userId/decks") ?: emptyList()
+            val serverDecksMap = serverDecks.associateBy { it.id }
 
-                    // 4. Process local soft-deleted cards
-                    val deletedCards = dbInstance.cardDao().getSoftDeletedCards()
-                    for (delCard in deletedCards) {
-                        ApiClient.delete("/users/$userId/decks/${delCard.deckId}/cards/${delCard.id}")
-                        dbInstance.cardDao().deleteCard(delCard)
-                    }
+            // 3. Process local soft-deleted decks
+            val deletedDecks = dbInstance.deckDao().getSoftDeletedDecks()
+            for (delDeck in deletedDecks) {
+                ApiClient.delete("/users/$userId/decks/${delDeck.id}")
+                dbInstance.deckDao().deleteDeck(delDeck)
+            }
 
-                    // 5. Get active Room decks & cards
-                    val localDecks = dbInstance.deckDao().getAllDecksSync()
-                    for (localDeck in localDecks) {
-                        val serverDeck = serverDecksMap[localDeck.id]
-                        if (serverDeck == null) {
-                            // Deck only exists locally (added while offline)
-                            val localCards = dbInstance.cardDao().getCardsByDeckIdSync(localDeck.id)
-                            val deckToSend = localDeck.toDeck().copy(cards = localCards.map { it.toCard() })
-                            ApiClient.post<Deck, Deck>("/users/$userId/decks", deckToSend)
+            // 4. Process local soft-deleted cards
+            val deletedCards = dbInstance.cardDao().getSoftDeletedCards()
+            for (delCard in deletedCards) {
+                ApiClient.delete("/users/$userId/decks/${delCard.deckId}/cards/${delCard.id}")
+                dbInstance.cardDao().deleteCard(delCard)
+            }
+
+            // 5. Get active Room decks & cards
+            val localDecks = dbInstance.deckDao().getAllDecksSync()
+            for (localDeck in localDecks) {
+                val serverDeck = serverDecksMap[localDeck.id]
+                if (serverDeck == null) {
+                    // Deck only exists locally (added while offline)
+                    val localCards = dbInstance.cardDao().getCardsByDeckIdSync(localDeck.id)
+                    val deckToSend = localDeck.toDeck().copy(cards = localCards.map { it.toCard() })
+                    ApiClient.post<Deck, Deck>("/users/$userId/decks", deckToSend)
+                } else {
+                    // Deck exists on both: check if cards need syncing
+                    val localCards = dbInstance.cardDao().getCardsByDeckIdSync(localDeck.id)
+                    val serverCardsMap = serverDeck.cards.associateBy { it.id }
+
+                    for (localCard in localCards) {
+                        val serverCard = serverCardsMap[localCard.id]
+                        if (serverCard == null) {
+                            // Card only exists locally
+                            ApiClient.post<Card, Deck>("/users/$userId/decks/${localDeck.id}/cards", localCard.toCard())
                         } else {
-                            // Deck exists on both: check if cards need syncing
-                            val localCards = dbInstance.cardDao().getCardsByDeckIdSync(localDeck.id)
-                            val serverCardsMap = serverDeck.cards.associateBy { it.id }
-
-                            for (localCard in localCards) {
-                                val serverCard = serverCardsMap[localCard.id]
-                                if (serverCard == null) {
-                                    // Card only exists locally
-                                    ApiClient.post<Card, Deck>("/users/$userId/decks/${localDeck.id}/cards", localCard.toCard())
-                                } else {
-                                    // Card exists on both: update if local is newer
-                                    if (localCard.lastModified > (serverCard.lastReview)) {
-                                        ApiClient.put<Card, Deck>("/users/$userId/decks/${localDeck.id}/cards/${localCard.id}", localCard.toCard())
-                                    }
-                                }
+                            // Card exists on both: update if local is newer
+                            if (localCard.lastModified > (serverCard.lastReview)) {
+                                ApiClient.put<Card, Deck>("/users/$userId/decks/${localDeck.id}/cards/${localCard.id}", localCard.toCard())
                             }
                         }
                     }
-
-                    // 6. Fetch fresh latest state and update Room cache
-                    val freshDecks = ApiClient.get<List<Deck>>("/users/$userId/decks")
-                    val freshProfile = ApiClient.get<UserProfile>("/users/$userId")
-
-                    if (freshDecks != null) {
-                        // Clear Room database decks & cards
-                        val oldDecks = dbInstance.deckDao().getAllDecksSync()
-                        for (od in oldDecks) {
-                            dbInstance.deckDao().deleteDeck(od)
-                            val oldCards = dbInstance.cardDao().getCardsByDeckIdSync(od.id)
-                            for (oc in oldCards) {
-                                dbInstance.cardDao().deleteCard(oc)
-                            }
-                        }
-
-                        // Write fresh server decks & cards to Room
-                        for (d in freshDecks) {
-                            dbInstance.deckDao().insertDeck(com.example.mindcard.data.local.entity.DeckEntity.fromDeck(d))
-                            for (c in d.cards) {
-                                dbInstance.cardDao().insertCard(com.example.mindcard.data.local.entity.CardEntity.fromCard(c, d.id))
-                            }
-                        }
-
-                        withContext(Dispatchers.Main) {
-                            decks.clear()
-                            decks.addAll(freshDecks)
-                        }
-                    }
-
-                    if (freshProfile != null) {
-                        dbInstance.userProfileDao().insertUserProfile(com.example.mindcard.data.local.entity.UserProfileEntity.fromUserProfile(freshProfile, userId))
-                        withContext(Dispatchers.Main) {
-                            userProfile.value = freshProfile
-                        }
-                    }
-
-                    refreshWidget()
-                } catch (e: Exception) {
-                    e.printStackTrace()
                 }
             }
+
+            // 6. Fetch fresh latest state and update Room cache
+            val freshDecks = ApiClient.get<List<Deck>>("/users/$userId/decks")
+            val freshProfile = ApiClient.get<UserProfile>("/users/$userId")
+
+            if (freshDecks != null) {
+                // Clear Room database decks & cards
+                val oldDecks = dbInstance.deckDao().getAllDecksSync()
+                for (od in oldDecks) {
+                    dbInstance.deckDao().deleteDeck(od)
+                    val oldCards = dbInstance.cardDao().getCardsByDeckIdSync(od.id)
+                    for (oc in oldCards) {
+                        dbInstance.cardDao().deleteCard(oc)
+                    }
+                }
+
+                // Write fresh server decks & cards to Room
+                for (d in freshDecks) {
+                    dbInstance.deckDao().insertDeck(com.example.mindcard.data.local.entity.DeckEntity.fromDeck(d))
+                    for (c in d.cards) {
+                        dbInstance.cardDao().insertCard(com.example.mindcard.data.local.entity.CardEntity.fromCard(c, d.id))
+                    }
+                }
+
+                withContext(Dispatchers.Main) {
+                    decks.clear()
+                    decks.addAll(freshDecks)
+                }
+            }
+
+            if (freshProfile != null) {
+                dbInstance.userProfileDao().insertUserProfile(com.example.mindcard.data.local.entity.UserProfileEntity.fromUserProfile(freshProfile, userId))
+                withContext(Dispatchers.Main) {
+                    userProfile.value = freshProfile
+                }
+            }
+
+            refreshWidget()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
