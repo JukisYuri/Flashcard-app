@@ -102,6 +102,8 @@ object Database {
     private var skipNextDeckListener = false
 
     private var currentUserId: String? = null
+    var isLoaded = false
+        private set
 
     // Room Database
     private var appDatabase: AppDatabase? = null
@@ -138,6 +140,7 @@ object Database {
     fun initializeUserPersistence(userId: String) {
         if (currentUserId == userId) return // Already initialized for this user
 
+        isLoaded = false
         currentUserId = userId
 
         // Check if we should use offline mode
@@ -154,8 +157,12 @@ object Database {
                     if (profile != null) {
                         withContext(Dispatchers.Main) {
                             userProfile.value = profile
+                            isLoaded = true
+                            markTodayAsActive()
                         }
                         saveProfileToLocal(userId, profile)
+                    } else {
+                        loadFromLocalDatabase(userId)
                     }
                     val fetchedDecks = ApiClient.get<List<Deck>>("/users/$userId/decks")
                     if (fetchedDecks != null) {
@@ -181,8 +188,12 @@ object Database {
         scope.launch {
             // Load user profile
             val profileEntity = database.userProfileDao().getUserProfileSync(userId)
-            if (profileEntity != null) {
-                userProfile.value = profileEntity.toUserProfile()
+            withContext(Dispatchers.Main) {
+                if (profileEntity != null) {
+                    userProfile.value = profileEntity.toUserProfile()
+                }
+                isLoaded = true
+                markTodayAsActive()
             }
 
             // Load decks
@@ -195,8 +206,10 @@ object Database {
                 loadedDecks.add(deckEntity.toDeck().copy(cards = cards))
             }
 
-            decks.clear()
-            decks.addAll(loadedDecks)
+            withContext(Dispatchers.Main) {
+                decks.clear()
+                decks.addAll(loadedDecks)
+            }
         }
     }
 
@@ -494,6 +507,7 @@ object Database {
     }
 
     fun markTodayAsActive() {
+        if (!isLoaded) return
         val profile = userProfile.value
         val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val updatedHistory = profile.studyHistory.toMutableMap()
