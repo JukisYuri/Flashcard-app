@@ -28,9 +28,11 @@ import com.example.mindcard.DailyChallenge
 import com.example.mindcard.FlashcardStudy
 import com.example.mindcard.data.Deck
 import com.example.mindcard.data.FsrsAlgorithm
-import com.example.mindcard.ui.screens.*
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.platform.LocalContext
 
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.mindcard.data.sync.SyncManager
 import com.example.mindcard.ui.viewmodel.HomeViewModel
 
 val PrimaryIndigo = Color(0xFF6C63FF)
@@ -47,10 +49,12 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val scrollState = rememberScrollState()
     val userProfile by viewModel.userProfile
     val decks = viewModel.decks
     val totalDueCards = viewModel.getTotalDueCards()
+    var deckToDelete by remember { mutableStateOf<Deck?>(null) }
 
     Column(
         modifier = modifier
@@ -214,25 +218,52 @@ fun HomeScreen(
                 onClick = { onItemClick(CreateDeck()) },
                 onSeedClick = { viewModel.seedDemoData() }
             )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                decks.forEachIndexed { index, deck ->
-                    DeckCardVertical(
-                        deck = deck,
-                        isHot = index == 0,
-                        onClick = {
-                            if (deck.cards.isNotEmpty()) {
-                                onItemClick(FlashcardStudy(deck.id))
-                            } else {
-                                onItemClick(CreateCard(deck.id))
-                            }
+        }  else {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            decks.forEachIndexed { index, deck ->
+                DeckCardVertical(
+                    deck = deck,
+                    isHot = index == 0,
+                    onClick = {
+                        if (deck.cards.isNotEmpty()) {
+                            onItemClick(FlashcardStudy(deck.id))
+                        } else {
+                            onItemClick(CreateCard(deck.id))
                         }
-                    )
-                }
+                    },
+                    onDeleteClick = { deckToDelete = deck }
+                )
             }
         }
+    }
+    Spacer(modifier = Modifier.height(80.dp))
+    }
 
-        Spacer(modifier = Modifier.height(80.dp))
+    if (deckToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { deckToDelete = null },
+            title = { Text("Delete Deck?", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to delete '${deckToDelete?.name}'? This action cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deckToDelete?.let { deck ->
+                            val syncManager = SyncManager(context)
+                            viewModel.deleteDeckPermanently(deck.id, syncManager)
+                        }
+                        deckToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBA1A1A))
+                ) {
+                    Text("Delete", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deckToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -324,59 +355,77 @@ fun GoalCardCircular(
     }
 }
 
-@Composable
-fun DeckCardVertical(
-    deck: Deck,
-    isHot: Boolean,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    @Composable
+    fun DeckCardVertical(
+        deck: Deck,
+        isHot: Boolean,
+        onClick: () -> Unit,
+        onDeleteClick: () -> Unit
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        Card(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .background(PrimaryIndigo.copy(alpha = 0.15f), CircleShape),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
                 ) {
-                    Text(
-                        text = deck.name.take(1).uppercase(),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = PrimaryIndigo
-                    )
-                }
-
-                if (isHot) {
                     Box(
                         modifier = Modifier
-                            .background(AccentYellow.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                            .size(52.dp)
+                            .background(PrimaryIndigo.copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Hot",
-                            fontSize = 12.sp,
+                            text = deck.name.take(1).uppercase(),
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = AccentYellow
+                            color = PrimaryIndigo
                         )
                     }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (isHot) {
+                            Box(
+                                modifier = Modifier
+                                    .background(AccentYellow.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = "Hot",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AccentYellow
+                                )
+                            }
+                        }
+
+                        // Nút X (Delete)
+                        IconButton(
+                            onClick = onDeleteClick,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Delete Deck",
+                                tint = OutlineColor
+                            )
+                        }
+                    }
                 }
-            }
 
             Column(
                 verticalArrangement = Arrangement.spacedBy(6.dp),

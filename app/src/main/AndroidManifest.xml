@@ -26,6 +26,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".ui.main.QuickAddActivity"
+            android:exported="true"
+            android:label="Add to Mind Card"
+            android:theme="@style/Theme.MindCard.Transparent"> <intent-filter>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <data android:mimeType="text/plain" /> </intent-filter>
+        </activity>
 
         <receiver
             android:name=".receiver.ReminderReceiver"

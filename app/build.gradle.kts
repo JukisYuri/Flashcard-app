@@ -26,6 +26,8 @@ android {
         }
         val apiKey = properties.getProperty("GEMINI_API_KEY") ?: ""
         buildConfigField("String", "GEMINI_API_KEY", "\"$apiKey\"")
+        val qwenKey = properties.getProperty("QWEN_API_KEY") ?: ""
+        buildConfigField("String", "QWEN_API_KEY", "\"$qwenKey\"")
     }
 
     buildTypes {
@@ -58,9 +60,12 @@ kotlin {
 }
 
 dependencies {
+    implementation(libs.androidx.compose.runtime)
+    implementation(libs.androidx.material3)
     val composeBom = platform(libs.androidx.compose.bom)
   implementation(composeBom)
   androidTestImplementation(composeBom)
+    implementation(libs.okhttp)
 
   // Core Android dependencies
   implementation(libs.androidx.core.ktx)
