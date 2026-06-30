@@ -50,7 +50,9 @@ fun MainNavigation(onThemeChanged: ((Boolean) -> Unit)? = null) {
           )
         }
         entry<FlashcardStudy> { entry ->
-          FlashcardStudyScreen(deckId = entry.deckId, onNavigate = { navKey -> backStack.add(navKey) })
+          FlashcardStudyScreen(deckId = entry.deckId, onNavigate = { navKey ->
+            if (navKey == Main) backStack.removeLastOrNull() else backStack.add(navKey)
+          })
         }
         entry<StudyResult> { entry ->
           val res = entry
@@ -59,17 +61,31 @@ fun MainNavigation(onThemeChanged: ((Boolean) -> Unit)? = null) {
               accuracy = res.accuracy,
               xpEarned = res.xpEarned,
               timeMinutes = res.timeMinutes,
-              onNavigate = { navKey -> backStack.add(navKey) }
+              onNavigate = { navKey ->
+                if (navKey == Main) {
+                  // Quay lại Main bằng cách pop cả màn hình Kết quả và màn hình Học
+                  backStack.removeLastOrNull() // Pop ResultScreen
+                  backStack.removeLastOrNull() // Pop FlashcardStudyScreen
+                } else {
+                  backStack.add(navKey)
+                }
+              }
           )
         }
         entry<CreateDeck> { entry ->
-          CreateDeckScreen(deckId = entry.deckId, onNavigate = { navKey -> backStack.add(navKey) })
+          CreateDeckScreen(deckId = entry.deckId, onNavigate = { navKey ->
+            if (navKey == Main) backStack.removeLastOrNull() else backStack.add(navKey)
+          })
         }
         entry<CreateAI> {
-          CreateAiScreen(onNavigate = { navKey -> backStack.add(navKey) })
+          CreateAiScreen(onNavigate = { navKey ->
+            if (navKey == Main) backStack.removeLastOrNull() else backStack.add(navKey)
+          })
         }
         entry<CreateCard> { entry ->
-          CreateCardScreen(deckId = entry.deckId, onNavigate = { navKey -> backStack.add(navKey) })
+          CreateCardScreen(deckId = entry.deckId, onNavigate = { navKey ->
+            if (navKey == Main) backStack.removeLastOrNull() else backStack.add(navKey)
+          })
         }
         entry<Settings> {
           SettingsScreen(

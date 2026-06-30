@@ -9,12 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -341,11 +336,77 @@ fun CreateDeckScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Mini Live Preview
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(110.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF4F6FA)),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize().padding(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = viewModel.cardFrontEdit.ifEmpty { "Word" },
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (viewModel.cardFrontEdit.isEmpty()) OutlineColor.copy(alpha = 0.6f) else Color(0xFF191C1E)
+                                    )
+                                    if (viewModel.cardPosEdit.isNotEmpty()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .background(PrimaryIndigo.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = viewModel.cardPosEdit.uppercase(),
+                                                color = PrimaryIndigo,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                                if (viewModel.cardPronunciationEdit.isNotEmpty()) {
+                                    Text(
+                                        text = viewModel.cardPronunciationEdit,
+                                        fontSize = 12.sp,
+                                        color = OutlineColor,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                    )
+                                }
+                                if (viewModel.cardBackEdit.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = viewModel.cardBackEdit,
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF555555),
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = viewModel.cardFrontEdit,
                         onValueChange = { viewModel.cardFrontEdit = it },
                         label = { Text("English Word/Phrase") },
                         placeholder = { Text("e.g. Serendipity") },
+                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = OutlineColor) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = OutlineVariantColor.copy(alpha = 0.5f),
+                            focusedBorderColor = PrimaryIndigo,
+                            focusedLabelColor = PrimaryIndigo
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
@@ -355,12 +416,18 @@ fun CreateDeckScreen(
                         onValueChange = { viewModel.cardPronunciationEdit = it },
                         label = { Text("Phonetic Pronunciation") },
                         placeholder = { Text("e.g. /ˌser.ənˈdɪp.ə.ti/") },
+                        leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null, tint = OutlineColor) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = OutlineVariantColor.copy(alpha = 0.5f),
+                            focusedBorderColor = PrimaryIndigo,
+                            focusedLabelColor = PrimaryIndigo
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
 
                     // Part of speech selector (Segmented Control style)
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("Part of Speech", fontSize = 12.sp, color = OutlineColor, fontWeight = FontWeight.Bold)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -370,15 +437,16 @@ fun CreateDeckScreen(
                                 val selected = viewModel.cardPosEdit == pos
                                 Button(
                                     onClick = { viewModel.cardPosEdit = pos },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.weight(1f).height(38.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (selected) PrimaryIndigo else Color(0xFFEFF1F8),
-                                        contentColor = if (selected) Color.White else OutlineColor
+                                        containerColor = if (selected) PrimaryIndigo.copy(alpha = 0.1f) else Color(0xFFF4F6FA),
+                                        contentColor = if (selected) PrimaryIndigo else OutlineColor
                                     ),
+                                    border = BorderStroke(1.dp, if (selected) PrimaryIndigo else Color.Transparent),
                                     contentPadding = PaddingValues(0.dp),
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = RoundedCornerShape(10.dp)
                                 ) {
-                                    Text(pos, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(pos, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }
@@ -389,6 +457,12 @@ fun CreateDeckScreen(
                         onValueChange = { viewModel.cardBackEdit = it },
                         label = { Text("Definition / Meaning") },
                         placeholder = { Text("e.g. Sự tình cờ may mắn") },
+                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = OutlineColor) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = OutlineVariantColor.copy(alpha = 0.5f),
+                            focusedBorderColor = PrimaryIndigo,
+                            focusedLabelColor = PrimaryIndigo
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
@@ -398,6 +472,12 @@ fun CreateDeckScreen(
                         onValueChange = { viewModel.cardExampleEdit = it },
                         label = { Text("Example Sentence") },
                         placeholder = { Text("e.g. We found the restaurant by serendipity.") },
+                        leadingIcon = { Icon(Icons.Default.Star, contentDescription = null, tint = OutlineColor) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = OutlineVariantColor.copy(alpha = 0.5f),
+                            focusedBorderColor = PrimaryIndigo,
+                            focusedLabelColor = PrimaryIndigo
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
@@ -407,6 +487,12 @@ fun CreateDeckScreen(
                         onValueChange = { viewModel.cardSynonymsEdit = it },
                         label = { Text("Synonyms") },
                         placeholder = { Text("e.g. chance, accident") },
+                        leadingIcon = { Icon(Icons.Default.List, contentDescription = null, tint = OutlineColor) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = OutlineVariantColor.copy(alpha = 0.5f),
+                            focusedBorderColor = PrimaryIndigo,
+                            focusedLabelColor = PrimaryIndigo
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )

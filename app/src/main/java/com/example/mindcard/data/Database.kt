@@ -14,13 +14,18 @@ import com.example.mindcard.data.sync.SyncManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import kotlinx.serialization.Serializable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
+@Serializable
 data class Card(
     val id: String = UUID.randomUUID().toString(),
     val englishWord: String = "",
@@ -61,6 +66,7 @@ data class Card(
     }
 }
 
+@Serializable
 data class Deck(
     val id: String = UUID.randomUUID().toString(),
     val name: String = "",
@@ -71,6 +77,7 @@ data class Deck(
     val tags: List<String> = emptyList()
 )
 
+@Serializable
 data class UserProfile(
     val name: String = "Guest Learner",
     val title: String = "Language Explorer",
@@ -92,9 +99,6 @@ object Database {
     var currentSessionTime = 0
     private var skipNextDeckListener = false
 
-    private val db by lazy { FirebaseFirestore.getInstance() }
-    private var profileListener: ListenerRegistration? = null
-    private var decksListener: ListenerRegistration? = null
     private var currentUserId: String? = null
 
     // Room Database
@@ -132,10 +136,6 @@ object Database {
     fun initializeUserPersistence(userId: String) {
         if (currentUserId == userId) return // Already initialized for this user
 
-        // Clean up previous listeners
-        profileListener?.remove()
-        decksListener?.remove()
-
         currentUserId = userId
 
         // Check if we should use offline mode
@@ -145,8 +145,30 @@ object Database {
             // Load from Room database
             loadFromLocalDatabase(userId)
         } else {
-            // Use Firestore with local caching
-            setupFirestoreListeners(userId)
+            // Fetch profile and decks from Spring Boot backend asynchronously
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val profile = ApiClient.get<UserProfile>("/users/$userId")
+                    if (profile != null) {
+                        withContext(Dispatchers.Main) {
+                            userProfile.value = profile
+                        }
+                        saveProfileToLocal(userId, profile)
+                    }
+                    val fetchedDecks = ApiClient.get<List<Deck>>("/users/$userId/decks")
+                    if (fetchedDecks != null) {
+                        withContext(Dispatchers.Main) {
+                            decks.clear()
+                            decks.addAll(fetchedDecks)
+                        }
+                        saveDecksToLocal(fetchedDecks)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    // Fallback to local Room database on connection error
+                    loadFromLocalDatabase(userId)
+                }
+            }
         }
     }
 
@@ -173,53 +195,6 @@ object Database {
 
             decks.clear()
             decks.addAll(loadedDecks)
-        }
-    }
-
-    private fun setupFirestoreListeners(userId: String) {
-        // Listen to profile
-        val profileRef = db.collection("users").document(userId)
-        profileListener = profileRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                // Fallback to local database
-                loadFromLocalDatabase(userId)
-                return@addSnapshotListener
-            }
-            if (snapshot != null && snapshot.exists()) {
-                val profile = snapshot.toObject(UserProfile::class.java)
-                if (profile != null) {
-                    userProfile.value = profile
-                    // Save to local database
-                    saveProfileToLocal(userId, profile)
-                }
-            } else {
-                // If profile doesn't exist, create it
-                val displayName = FirebaseAuth.getInstance().currentUser?.displayName ?: "Learner"
-                val initialProfile = UserProfile(name = displayName)
-                profileRef.set(initialProfile)
-                saveProfileToLocal(userId, initialProfile)
-            }
-        }
-
-        // Listen to decks
-        val decksRef = db.collection("users").document(userId).collection("decks")
-        decksListener = decksRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                loadFromLocalDatabase(userId)
-                return@addSnapshotListener
-            }
-            if (skipNextDeckListener) {
-                skipNextDeckListener = false
-                return@addSnapshotListener
-            }
-            if (snapshot != null) {
-                val fetchedDecks = snapshot.documents.mapNotNull { doc ->
-                    doc.toObject(Deck::class.java)?.copy(id = doc.id)
-                }
-                decks.clear()
-                decks.addAll(fetchedDecks)
-                saveDecksToLocal(fetchedDecks)
-            }
         }
     }
 
@@ -251,10 +226,6 @@ object Database {
     }
 
     fun clearPersistence() {
-        profileListener?.remove()
-        decksListener?.remove()
-        profileListener = null
-        decksListener = null
         currentUserId = null
         decks.clear()
         userProfile.value = UserProfile()
@@ -264,14 +235,16 @@ object Database {
         val newDeck = Deck(name = name, category = category, coverUrl = coverUrl)
         val userId = currentUserId
         if (userId != null) {
-            if (useOfflineMode) {
-                // Save to Room
-                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                scope.launch {
+            decks.add(newDeck)
+            val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+            scope.launch {
+                if (useOfflineMode) {
+                    syncManager?.addDeck(DeckEntity.fromDeck(newDeck))
+                } else {
+                    ApiClient.post<Deck, Deck>("/users/$userId/decks", newDeck)
                     syncManager?.addDeck(DeckEntity.fromDeck(newDeck))
                 }
-            } else {
-                db.collection("users").document(userId).collection("decks").document(newDeck.id).set(newDeck)
+                refreshWidget()
             }
         } else {
             decks.add(newDeck)
@@ -289,16 +262,22 @@ object Database {
         )
         val userId = currentUserId
         if (userId != null) {
-            if (useOfflineMode) {
-                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                scope.launch {
+            decks.add(newDeck)
+            val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+            scope.launch {
+                if (useOfflineMode) {
+                    syncManager?.addDeck(DeckEntity.fromDeck(newDeck))
+                    for (card in cards) {
+                        syncManager?.addCard(CardEntity.fromCard(card, newDeck.id))
+                    }
+                } else {
+                    ApiClient.post<Deck, Deck>("/users/$userId/decks", newDeck)
                     syncManager?.addDeck(DeckEntity.fromDeck(newDeck))
                     for (card in cards) {
                         syncManager?.addCard(CardEntity.fromCard(card, newDeck.id))
                     }
                 }
-            } else {
-                db.collection("users").document(userId).collection("decks").document(newDeck.id).set(newDeck)
+                refreshWidget()
             }
         } else {
             decks.add(newDeck)
@@ -311,18 +290,19 @@ object Database {
         if (index != -1) {
             val deck = decks[index]
             val updatedDeck = deck.copy(name = name, category = category)
+            decks[index] = updatedDeck
             val userId = currentUserId
             if (userId != null) {
-                if (useOfflineMode) {
-                    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                    scope.launch {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+                    } else {
+                        ApiClient.put<Deck, Deck>("/users/$userId/decks/$deckId", updatedDeck)
                         syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
                     }
-                } else {
-                    db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+                    refreshWidget()
                 }
-            } else {
-                decks[index] = updatedDeck
             }
         }
     }
@@ -336,19 +316,21 @@ object Database {
                 cards = updatedCards,
                 masteredPercentage = calculateMastered(updatedCards)
             )
+            decks[index] = updatedDeck
             val userId = currentUserId
             if (userId != null) {
-                if (useOfflineMode) {
-                    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                    scope.launch {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.addCard(CardEntity.fromCard(card, deckId))
+                        syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+                    } else {
+                        ApiClient.post<Card, Deck>("/users/$userId/decks/$deckId/cards", card)
                         syncManager?.addCard(CardEntity.fromCard(card, deckId))
                         syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
                     }
-                } else {
-                    db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+                    refreshWidget()
                 }
-            } else {
-                decks[index] = updatedDeck
             }
         }
     }
@@ -362,19 +344,21 @@ object Database {
                 cards = updatedCards,
                 masteredPercentage = calculateMastered(updatedCards)
             )
+            decks[index] = updatedDeck
             val userId = currentUserId
             if (userId != null) {
-                if (useOfflineMode) {
-                    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                    scope.launch {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.deleteCard(cardId)
+                        syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+                    } else {
+                        ApiClient.delete("/users/$userId/decks/$deckId/cards/$cardId")
                         syncManager?.deleteCard(cardId)
                         syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
                     }
-                } else {
-                    db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+                    refreshWidget()
                 }
-            } else {
-                decks[index] = updatedDeck
             }
         }
     }
@@ -383,29 +367,34 @@ object Database {
         val index = decks.indexOfFirst { it.id == deckId }
         if (index != -1) {
             val deck = decks[index]
+            var cardToUpdate: Card? = null
             val updatedCards = deck.cards.map { card ->
-                if (card.id == cardId) card.copy(englishWord = newFront, definition = newBack) else card
+                if (card.id == cardId) {
+                    val c = card.copy(englishWord = newFront, definition = newBack)
+                    cardToUpdate = c
+                    c
+                } else card
             }
             val updatedDeck = deck.copy(
                 cards = updatedCards,
                 masteredPercentage = calculateMastered(updatedCards)
             )
+            decks[index] = updatedDeck
             val userId = currentUserId
-            if (userId != null) {
-                if (useOfflineMode) {
-                    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                    scope.launch {
-                        val updatedCard = updatedCards.find { it.id == cardId }
-                        if (updatedCard != null) {
-                            syncManager?.updateCard(CardEntity.fromCard(updatedCard, deckId))
-                        }
+            val cardObj = cardToUpdate
+            if (userId != null && cardObj != null) {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.updateCard(CardEntity.fromCard(cardObj, deckId))
+                        syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+                    } else {
+                        ApiClient.put<Card, Deck>("/users/$userId/decks/$deckId/cards/$cardId", cardObj)
+                        syncManager?.updateCard(CardEntity.fromCard(cardObj, deckId))
                         syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
                     }
-                } else {
-                    db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+                    refreshWidget()
                 }
-            } else {
-                decks[index] = updatedDeck
             }
         }
     }
@@ -423,9 +412,10 @@ object Database {
         val index = decks.indexOfFirst { it.id == deckId }
         if (index != -1) {
             val deck = decks[index]
+            var cardToUpdate: Card? = null
             val updatedCards = deck.cards.map { card ->
                 if (card.id == cardId) {
-                    card.copy(
+                    val c = card.copy(
                         englishWord = englishWord,
                         pronunciation = pronunciation,
                         pos = pos,
@@ -433,61 +423,67 @@ object Database {
                         exampleSentence = exampleSentence,
                         synonyms = synonyms
                     )
+                    cardToUpdate = c
+                    c
                 } else card
             }
             val updatedDeck = deck.copy(
                 cards = updatedCards,
                 masteredPercentage = calculateMastered(updatedCards)
             )
+            decks[index] = updatedDeck
             val userId = currentUserId
-            if (userId != null) {
-                if (useOfflineMode) {
-                    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                    scope.launch {
-                        val updatedCard = updatedCards.find { it.id == cardId }
-                        if (updatedCard != null) {
-                            syncManager?.updateCard(CardEntity.fromCard(updatedCard, deckId))
-                        }
+            val cardObj = cardToUpdate
+            if (userId != null && cardObj != null) {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.updateCard(CardEntity.fromCard(cardObj, deckId))
+                        syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+                    } else {
+                        ApiClient.put<Card, Deck>("/users/$userId/decks/$deckId/cards/$cardId", cardObj)
+                        syncManager?.updateCard(CardEntity.fromCard(cardObj, deckId))
                         syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
                     }
-                } else {
-                    db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+                    refreshWidget()
                 }
-            } else {
-                decks[index] = updatedDeck
             }
         }
     }
 
     fun deleteDeck(deckId: String) {
+        val index = decks.indexOfFirst { it.id == deckId }
+        if (index != -1) {
+            decks.removeAt(index)
+        }
         val userId = currentUserId
         if (userId != null) {
-            if (useOfflineMode) {
-                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                scope.launch {
+            val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+            scope.launch {
+                if (useOfflineMode) {
+                    syncManager?.deleteDeck(deckId)
+                } else {
+                    ApiClient.delete("/users/$userId/decks/$deckId")
                     syncManager?.deleteDeck(deckId)
                 }
-            } else {
-                db.collection("users").document(userId).collection("decks").document(deckId).delete()
+                refreshWidget()
             }
-        } else {
-            decks.removeAll { it.id == deckId }
         }
     }
 
     fun updateUserProfile(profile: UserProfile) {
+        userProfile.value = profile
         val userId = currentUserId
         if (userId != null) {
-            if (useOfflineMode) {
-                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                scope.launch {
+            val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+            scope.launch {
+                if (useOfflineMode) {
+                    syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(profile, userId))
+                } else {
+                    ApiClient.put<UserProfile, UserProfile>("/users/$userId", profile)
                     syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(profile, userId))
                 }
-            } else {
-                db.collection("users").document(userId).set(profile)
             }
-        } else {
-            userProfile.value = profile
         }
     }
 
@@ -525,56 +521,65 @@ object Database {
         currentSessionXp = xp
         currentSessionTime = timeMin
 
+        // Optimistic UI updates
         val profile = userProfile.value
         val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val updatedHistory = profile.studyHistory.toMutableMap()
 
+        val yesterdayCal = Calendar.getInstance()
+        yesterdayCal.add(Calendar.DAY_OF_YEAR, -1)
+        val yesterdayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(yesterdayCal.time)
+        val studiedYesterday = updatedHistory[yesterdayStr] == true
+
+        var newStreak = profile.currentStreak
         if (updatedHistory[todayStr] != true) {
-            val yesterdayCal = Calendar.getInstance()
-            yesterdayCal.add(Calendar.DAY_OF_YEAR, -1)
-            val yesterdayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(yesterdayCal.time)
-            val studiedYesterday = updatedHistory[yesterdayStr] == true
-            val newStreak = if (studiedYesterday) profile.currentStreak + 1 else 1
+            newStreak = if (studiedYesterday) profile.currentStreak + 1 else 1
             updatedHistory[todayStr] = true
-            val bestStreak = maxOf(profile.bestStreak, newStreak)
-
-            val uniqueWords = decks.flatMap { it.cards }.map { it.englishWord.lowercase() }.distinct().size
-
-            val updatedProfile = profile.copy(
-                totalXp = profile.totalXp + xp,
-                currentStreak = newStreak,
-                bestStreak = bestStreak,
-                totalWordsLearned = uniqueWords,
-                studyHistory = updatedHistory
-            )
-            updateUserProfile(updatedProfile)
-        } else {
-            val uniqueWords = decks.flatMap { it.cards }.map { it.englishWord.lowercase() }.distinct().size
-            val updatedProfile = profile.copy(
-                totalXp = profile.totalXp + xp,
-                totalWordsLearned = uniqueWords
-            )
-            updateUserProfile(updatedProfile)
         }
+        val bestStreak = maxOf(profile.bestStreak, newStreak)
+        val uniqueWords = decks.flatMap { it.cards }.map { it.englishWord.lowercase() }.distinct().size
 
+        val updatedProfile = profile.copy(
+            totalXp = profile.totalXp + xp,
+            currentStreak = newStreak,
+            bestStreak = bestStreak,
+            totalWordsLearned = uniqueWords,
+            studyHistory = updatedHistory
+        )
+        userProfile.value = updatedProfile
         // Update deck mastery progress slightly
         val deckIndex = decks.indexOfFirst { it.id == deckId }
         if (deckIndex != -1) {
             val deck = decks[deckIndex]
             val newMastery = minOf(100, deck.masteredPercentage + (accuracy / 10))
             val updatedDeck = deck.copy(masteredPercentage = newMastery)
+            decks[deckIndex] = updatedDeck
+
             val userId = currentUserId
             if (userId != null) {
-                if (useOfflineMode) {
-                    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                    scope.launch {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+                        syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(updatedProfile, userId))
+                    } else {
+                        // Asynchronous server sync
+                        try {
+                            val req = StudySessionRequest(deckId, accuracy, xp, timeMin)
+                            val respProfile = ApiClient.post<StudySessionRequest, UserProfile>("/users/$userId/decks/study-session", req)
+                            if (respProfile != null) {
+                                withContext(Dispatchers.Main) {
+                                    userProfile.value = respProfile
+                                }
+                                syncManager?.updateUserProfile(UserProfileEntity.fromUserProfile(respProfile, userId))
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                         syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
                     }
-                } else {
-                    db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+                    refreshWidget()
                 }
-            } else {
-                decks[deckIndex] = updatedDeck
             }
         }
     }
@@ -587,12 +592,24 @@ object Database {
                 if (card.id == updatedCard.id) updatedCard else card
             }
             val updatedDeck = deck.copy(cards = updatedCards)
-            // Always update local state first for immediate UI feedback
             decks[index] = updatedDeck
-            // Then sync to Firestore if online
+
             val userId = currentUserId
-            if (userId != null && !useOfflineMode) {
-                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
+            if (userId != null) {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.updateCard(CardEntity.fromCard(updatedCard, deckId))
+                    } else {
+                        try {
+                            ApiClient.put<Card, Deck>("/users/$userId/decks/$deckId/cards/${updatedCard.id}", updatedCard)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                        syncManager?.updateCard(CardEntity.fromCard(updatedCard, deckId))
+                    }
+                    refreshWidget()
+                }
             }
         }
     }
@@ -606,17 +623,28 @@ object Database {
             val updatedCards = deck.cards.map { if (it.id == cardId) updatedCard else it }
             val updatedDeck = deck.copy(cards = updatedCards)
             decks[index] = updatedDeck
-            // Keep skip flag until next Firestore sync cycle completes
-            skipNextDeckListener = true
+
+            val userId = currentUserId
+            if (userId != null) {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.updateCard(CardEntity.fromCard(updatedCard, deckId))
+                    } else {
+                        try {
+                            ApiClient.put<Card, Deck>("/users/$userId/decks/$deckId/cards/$cardId", updatedCard)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                        syncManager?.updateCard(CardEntity.fromCard(updatedCard, deckId))
+                    }
+                }
+            }
         }
     }
 
     fun syncFavoritesToFirestore() {
-        val userId = currentUserId ?: return
-        skipNextDeckListener = false
-        for (deck in decks) {
-            db.collection("users").document(userId).collection("decks").document(deck.id).set(deck)
-        }
+        // No-op
     }
 
     fun getAllFavoriteCards(): List<Card> {
@@ -628,18 +656,23 @@ object Database {
         if (index != -1) {
             val deck = decks[index]
             val updatedDeck = deck.copy(tags = tags)
+            decks[index] = updatedDeck
+
             val userId = currentUserId
             if (userId != null) {
-                if (useOfflineMode) {
-                    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                    scope.launch {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+                    } else {
+                        try {
+                            ApiClient.put<Deck, Deck>("/users/$userId/decks/$deckId", updatedDeck)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                         syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
                     }
-                } else {
-                    db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
                 }
-            } else {
-                decks[index] = updatedDeck
             }
         }
     }
@@ -649,18 +682,23 @@ object Database {
         if (index != -1) {
             val deck = decks[index]
             val updatedDeck = deck.copy(masteredPercentage = mastery)
+            decks[index] = updatedDeck
+
             val userId = currentUserId
             if (userId != null) {
-                if (useOfflineMode) {
-                    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                    scope.launch {
+                val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                scope.launch {
+                    if (useOfflineMode) {
+                        syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
+                    } else {
+                        try {
+                            ApiClient.put<Deck, Deck>("/users/$userId/decks/$deckId", updatedDeck)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                         syncManager?.updateDeck(DeckEntity.fromDeck(updatedDeck))
                     }
-                } else {
-                    db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
                 }
-            } else {
-                decks[index] = updatedDeck
             }
         }
     }
@@ -674,202 +712,208 @@ object Database {
     }
 
     fun seedDemoData() {
-        val userId = currentUserId
-        if (userId != null) {
-            decks.forEach { deck ->
+        val userId = currentUserId ?: return
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+        scope.launch {
+            try {
+                val decksToSeed = listOf(
+                    Deck(
+                        id = UUID.randomUUID().toString(),
+                        name = "Daily Conversations",
+                        category = "Languages",
+                        cards = listOf(
+                            Card(englishWord = "Good morning", pronunciation = "/ɡʊd ˈmɔːrnɪŋ/", pos = "Phrase", definition = "A greeting used in the morning.", exampleSentence = "Good morning, how are you?"),
+                            Card(englishWord = "Thank you", pronunciation = "/θæŋk juː/", pos = "Phrase", definition = "Used to express gratitude.", exampleSentence = "Thank you for your help."),
+                            Card(englishWord = "Excuse me", pronunciation = "/ɪkˈskjuːz miː/", pos = "Phrase", definition = "Used to get attention or apologize.", exampleSentence = "Excuse me, where is the station?"),
+                            Card(englishWord = "I'm sorry", pronunciation = "/aɪm ˈsɔːri/", pos = "Phrase", definition = "An expression of regret or apology.", exampleSentence = "I'm sorry for being late."),
+                            Card(englishWord = "How are you?", pronunciation = "/haʊ ɑːr juː/", pos = "Phrase", definition = "A common greeting asking about well-being.", exampleSentence = "How are you doing today?"),
+                            Card(englishWord = "Nice to meet you", pronunciation = "/naɪs tə miːt juː/", pos = "Phrase", definition = "A polite response to introductions.", exampleSentence = "Nice to meet you, John."),
+                            Card(englishWord = "See you later", pronunciation = "/siː juː ˈleɪtər/", pos = "Phrase", definition = "A casual farewell phrase.", exampleSentence = "See you later, bye!"),
+                            Card(englishWord = "Take care", pronunciation = "/teɪk kɛr/", pos = "Phrase", definition = "A warm farewell wishing someone well.", exampleSentence = "Take care on your journey."),
+                            Card(englishWord = "Have a good day", pronunciation = "/hæv ə ɡʊd deɪ/", pos = "Phrase", definition = "A friendly farewell for daytime.", exampleSentence = "Have a good day at work!"),
+                            Card(englishWord = "Good night", pronunciation = "/ɡʊd naɪt/", pos = "Phrase", definition = "A farewell used before going to bed.", exampleSentence = "Good night, sweet dreams.")
+                        )
+                    ),
+                    Deck(
+                        id = UUID.randomUUID().toString(),
+                        name = "Business English",
+                        category = "Languages",
+                        cards = listOf(
+                            Card(englishWord = "Deadline", pronunciation = "/ˈdɛdlaɪn/", pos = "Noun", definition = "The latest time or date by which something should be completed.", exampleSentence = "The deadline is Friday at 5 PM."),
+                            Card(englishWord = "Meeting", pronunciation = "/ˈmiːtɪŋ/", pos = "Noun", definition = "An assembly of people for discussion.", exampleSentence = "Let's discuss this in the meeting."),
+                            Card(englishWord = "Presentation", pronunciation = "/ˌprɛzənˈteɪʃən/", pos = "Noun", definition = "A formal talk or demonstration.", exampleSentence = "She gave a great presentation."),
+                            Card(englishWord = "Negotiate", pronunciation = "/nɪˈɡoʊʃieɪt/", pos = "Verb", definition = "To discuss terms to reach agreement.", exampleSentence = "We need to negotiate a new contract."),
+                            Card(englishWord = "Collaborate", pronunciation = "/kəˈlæbəreɪt/", pos = "Verb", definition = "To work jointly with others.", exampleSentence = "Let's collaborate on this project."),
+                            Card(englishWord = "Delegate", pronunciation = "/ˈdɛlɪɡeɪt/", pos = "Verb", definition = "To entrust a task to another person.", exampleSentence = "You should delegate some tasks."),
+                            Card(englishWord = "Budget", pronunciation = "/ˈbʌdʒɪt/", pos = "Noun", definition = "An estimate of income and expenditure.", exampleSentence = "We are working on next year's budget."),
+                            Card(englishWord = "Revenue", pronunciation = "/ˈrɛvənjuː/", pos = "Noun", definition = "Income, especially of a company.", exampleSentence = "Our revenue increased this quarter."),
+                            Card(englishWord = "Strategy", pronunciation = "/ˈstrætədʒi/", pos = "Noun", definition = "A plan of action designed to achieve a goal.", exampleSentence = "We need a marketing strategy."),
+                            Card(englishWord = "Innovation", pronunciation = "/ˌɪnəˈveɪʃən/", pos = "Noun", definition = "A new method, idea, or product.", exampleSentence = "Innovation is key to our success.")
+                        )
+                    ),
+                    Deck(
+                        id = UUID.randomUUID().toString(),
+                        name = "Science Terms",
+                        category = "Science",
+                        cards = listOf(
+                            Card(englishWord = "Photosynthesis", pronunciation = "/ˌfoʊtoʊˈsɪnθəsɪs/", pos = "Noun", definition = "The process by which plants convert sunlight into energy.", exampleSentence = "Photosynthesis requires carbon dioxide and light."),
+                            Card(englishWord = "Gravity", pronunciation = "/ˈɡrævɪti/", pos = "Noun", definition = "The force that attracts objects toward each other.", exampleSentence = "Gravity keeps us on the ground."),
+                            Card(englishWord = "Molecule", pronunciation = "/ˈmɒlɪkjuːl/", pos = "Noun", definition = "A group of atoms bonded together.", exampleSentence = "Water is a simple molecule."),
+                            Card(englishWord = "Evolution", pronunciation = "/ˌɛvəˈluːʃən/", pos = "Noun", definition = "The development of species over time.", exampleSentence = "Darwin wrote about evolution."),
+                            Card(englishWord = "Experiment", pronunciation = "/ɪkˈspɛrɪmənt/", pos = "Noun", definition = "A scientific procedure to test a hypothesis.", exampleSentence = "We conducted an experiment in class."),
+                            Card(englishWord = "Hypothesis", pronunciation = "/haɪˈpɒθəsɪs/", pos = "Noun", definition = "A proposed explanation for a phenomenon.", exampleSentence = "We need to test our hypothesis."),
+                            Card(englishWord = "Ecosystem", pronunciation = "/ˈiːkoʊˌsɪstəm/", pos = "Noun", definition = "A community of living organisms.", exampleSentence = "The forest is a diverse ecosystem."),
+                            Card(englishWord = "Organism", pronunciation = "/ˈɔːrɡənɪzəm/", pos = "Noun", definition = "Any living thing.", exampleSentence = "A bacteria is a single-celled organism."),
+                            Card(englishWord = "Magnetic", pronunciation = "/mæɡˈnɛtɪk/", pos = "Adj", definition = "Relating to magnetism.", exampleSentence = "Compass needles point to the magnetic north."),
+                            Card(englishWord = "Chemical", pronunciation = "/ˈkɛmɪkəl/", pos = "Noun", definition = "Relating to chemistry or substances.", exampleSentence = "Oxygen is a chemical element.")
+                        )
+                    )
+                )
+
                 if (useOfflineMode) {
-                    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-                    scope.launch { syncManager?.deleteDeck(deck.id) }
+                    val currentDecks = decks.toList()
+                    for (deck in currentDecks) {
+                        syncManager?.deleteDeck(deck.id)
+                    }
+                    for (deck in decksToSeed) {
+                        syncManager?.addDeck(DeckEntity.fromDeck(deck))
+                        for (card in deck.cards) {
+                            syncManager?.addCard(CardEntity.fromCard(card, deck.id))
+                        }
+                    }
+                    withContext(Dispatchers.Main) {
+                        decks.clear()
+                        decks.addAll(decksToSeed)
+                    }
                 } else {
-                    db.collection("users").document(userId).collection("decks").document(deck.id).delete()
+                    val existingDecks = ApiClient.get<List<Deck>>("/users/$userId/decks") ?: emptyList()
+                    for (deck in existingDecks) {
+                        ApiClient.delete("/users/$userId/decks/${deck.id}")
+                        syncManager?.deleteDeck(deck.id)
+                    }
+
+                    for (deck in decksToSeed) {
+                        ApiClient.post<Deck, Deck>("/users/$userId/decks", deck)
+                        syncManager?.addDeck(DeckEntity.fromDeck(deck))
+                        for (card in deck.cards) {
+                            syncManager?.addCard(CardEntity.fromCard(card, deck.id))
+                        }
+                    }
+
+                    val freshDecks = ApiClient.get<List<Deck>>("/users/$userId/decks")
+                    if (freshDecks != null) {
+                        withContext(Dispatchers.Main) {
+                            decks.clear()
+                            decks.addAll(freshDecks)
+                        }
+                    }
                 }
+                refreshWidget()
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-        } else {
-            decks.clear()
         }
-
-        val now = System.currentTimeMillis()
-        val oneDayMs = 24 * 60 * 60 * 1000L
-
-        // === DECK 1: Daily Conversations ===
-        val convDeck = addDeck("Daily Conversations", "Languages", null)
-        val convWords = listOf(
-            Triple("Good morning", "/ɡʊd ˈmɔːrnɪŋ/", "A greeting used in the morning."),
-            Triple("Thank you", "/θæŋk juː/", "Used to express gratitude."),
-            Triple("Excuse me", "/ɪkˈskjuːz miː/", "Used to get attention or apologize."),
-            Triple("I'm sorry", "/aɪm ˈsɔːri/", "An expression of regret or apology."),
-            Triple("How are you?", "/haʊ ɑːr juː/", "A common greeting asking about well-being."),
-            Triple("Nice to meet you", "/naɪs tə miːt juː/", "A polite response to introductions."),
-            Triple("See you later", "/siː juː ˈleɪtər/", "A casual farewell phrase."),
-            Triple("Take care", "/teɪk kɛr/", "A warm farewell wishing someone well."),
-            Triple("Have a good day", "/hæv ə ɡʊd deɪ/", "A friendly farewell for daytime."),
-            Triple("Good night", "/ɡʊd naɪt/", "A farewell used before going to bed.")
-        )
-        convWords.forEach { (word, pron, def) ->
-            addCardToDeck(convDeck.id, Card(
-                englishWord = word, pronunciation = pron, pos = "Phrase",
-                definition = def, exampleSentence = " \"$word\" is commonly used in daily conversation.",
-                synonyms = "", easeFactor = 2.5, interval = 1.0, repetitions = 0,
-                nextReview = now, lastReview = 0L, reviewState = ReviewState.New.name
-            ))
-        }
-
-        // === DECK 2: Business English ===
-        val bizDeck = addDeck("Business English", "Languages", null)
-        val bizWords = listOf(
-            Triple("Deadline", "/ˈdɛdlaɪn/", "The latest time or date by which something should be completed."),
-            Triple("Meeting", "/ˈmiːtɪŋ/", "An assembly of people for discussion."),
-            Triple("Presentation", "/ˌprɛzənˈteɪʃən/", "A formal talk or demonstration."),
-            Triple("Negotiate", "/nɪˈɡoʊʃieɪt/", "To discuss terms to reach agreement."),
-            Triple("Collaborate", "/kəˈlæbəreɪt/", "To work jointly with others."),
-            Triple("Delegate", "/ˈdɛlɪɡeɪt/", "To entrust a task to another person."),
-            Triple("Budget", "/ˈbʌdʒɪt/", "An estimate of income and expenditure."),
-            Triple("Revenue", "/ˈrɛvənjuː/", "Income, especially of a company."),
-            Triple("Strategy", "/ˈstrætədʒi/", "A plan of action designed to achieve a goal."),
-            Triple("Innovation", "/ˌɪnəˈveɪʃən/", "A new method, idea, or product.")
-        )
-        bizWords.forEach { (word, pron, def) ->
-            addCardToDeck(bizDeck.id, Card(
-                englishWord = word, pronunciation = pron, pos = "Noun",
-                definition = def, exampleSentence = "We need to discuss the $word in today's meeting.",
-                synonyms = "", easeFactor = 2.5, interval = 1.0, repetitions = 0,
-                nextReview = now, lastReview = 0L, reviewState = ReviewState.New.name
-            ))
-        }
-
-        // === DECK 3: Science Terms ===
-        val sciDeck = addDeck("Science Terms", "Science", null)
-        val sciWords = listOf(
-            Triple("Photosynthesis", "/ˌfoʊtoʊˈsɪnθəsɪs/", "The process by which plants convert sunlight into energy."),
-            Triple("Gravity", "/ˈɡrævɪti/", "The force that attracts objects toward each other."),
-            Triple("Molecule", "/ˈmɒlɪkjuːl/", "A group of atoms bonded together."),
-            Triple("Evolution", "/ˌɛvəˈluːʃən/", "The development of species over time."),
-            Triple("Experiment", "/ɪkˈspɛrɪmənt/", "A scientific procedure to test a hypothesis."),
-            Triple("Hypothesis", "/haɪˈpɒθəsɪs/", "A proposed explanation for a phenomenon."),
-            Triple("Ecosystem", "/ˈiːkoʊˌsɪstəm/", "A community of living organisms."),
-            Triple("Organism", "/ˈɔːrɡənɪzəm/", "Any living thing."),
-            Triple("Magnetic", "/mæɡˈnɛtɪk/", "Relating to magnetism."),
-            Triple("Chemical", "/ˈkɛmɪkəl/", "Relating to chemistry or substances.")
-        )
-        sciWords.forEach { (word, pron, def) ->
-            addCardToDeck(sciDeck.id, Card(
-                englishWord = word, pronunciation = pron, pos = "Noun",
-                definition = def, exampleSentence = "The $word plays a crucial role in science.",
-                synonyms = "", easeFactor = 2.5, interval = 1.0, repetitions = 0,
-                nextReview = now, lastReview = 0L, reviewState = ReviewState.New.name
-            ))
-        }
-
-        // === DECK 4: Travel Vocabulary ===
-        val travelDeck = addDeck("Travel Vocabulary", "Languages", null)
-        val travelWords = listOf(
-            Triple("Passport", "/ˈpɑːspɔːrt/", "An official document for international travel."),
-            Triple("Airport", "/ˈɛrpɔːrt/", "A place where aircraft take off and land."),
-            Triple("Reservation", "/ˌrɛzərˈveɪʃən/", "A booking for a hotel or restaurant."),
-            Triple("Luggage", "/ˈlʌɡɪdʒ/", "Bags and suitcases for travel."),
-            Triple("Itinerary", "/aɪˈtɪnəreri/", "A planned route or journey schedule."),
-            Triple("Boarding pass", "/ˈbɔːrdɪŋ pæs/", "A document for boarding an aircraft."),
-            Triple("Customs", "/ˈkʌstəmz/", "An area at borders for checking goods."),
-            Triple("Currency", "/ˈkʌrənsi/", "A system of money in general use."),
-            Triple("Souvenir", "/ˌsuːvəˈnɪr/", "An item bought to remember a place."),
-            Triple("Excursion", "/ɪkˈskɜːrʒən/", "A short journey for pleasure.")
-        )
-        travelWords.forEach { (word, pron, def) ->
-            addCardToDeck(travelDeck.id, Card(
-                englishWord = word, pronunciation = pron, pos = "Noun",
-                definition = def, exampleSentence = "I need my $word for the trip.",
-                synonyms = "", easeFactor = 2.5, interval = 1.0, repetitions = 0,
-                nextReview = now, lastReview = 0L, reviewState = ReviewState.New.name
-            ))
-        }
-
-        // === DECK 5: Emotions & Feelings ===
-        val emoDeck = addDeck("Emotions & Feelings", "Languages", null)
-        val emoWords = listOf(
-            Triple("Grateful", "/ˈɡreɪtfəl/", "Feeling or showing thanks."),
-            Triple("Anxious", "/ˈæŋkʃəs/", "Feeling worried or nervous."),
-            Triple("Euphoric", "/juːˈfɔːrɪk/", "Feeling intense happiness."),
-            Triple("Melancholy", "/ˈmɛlənkɒli/", "A feeling of deep sadness."),
-            Triple("Nostalgic", "/nɒˈstældʒɪk/", "Feeling sentimental about the past."),
-            Triple("Curious", "/ˈkjʊəriəs/", "Eager to know or learn something."),
-            Triple("Confident", "/ˈkɒnfɪdənt/", "Feeling certain about one's abilities."),
-            Triple("Overwhelmed", "/ˌoʊvərˈwɛlmd/", "Feeling buried under difficulty."),
-            Triple("Content", "/kənˈtɛnt/", "In a state of peaceful happiness."),
-            Triple("Ambivalent", "/æmˈbɪvələnt/", "Having mixed feelings about something.")
-        )
-        emoWords.forEach { (word, pron, def) ->
-            addCardToDeck(emoDeck.id, Card(
-                englishWord = word, pronunciation = pron, pos = "Adj",
-                definition = def, exampleSentence = "I feel $word when I think about this.",
-                synonyms = "", easeFactor = 2.5, interval = 1.0, repetitions = 0,
-                nextReview = now, lastReview = 0L, reviewState = ReviewState.New.name
-            ))
-        }
-
-        // === DECK 6: Academic Words ===
-        val acadDeck = addDeck("Academic Words", "Science", null)
-        val acadWords = listOf(
-            Triple("Analyze", "/ˈænəlaɪz/", "To examine something in detail."),
-            Triple("Synthesize", "/ˈsɪnθəsaɪz/", "To combine elements into a whole."),
-            Triple("Evaluate", "/ɪˈvæljueɪt/", "To form an idea of the value of something."),
-            Triple("Significant", "/sɪɡˈnɪfɪkənt/", "Sufficiently great or important."),
-            Triple("Fundamental", "/ˌfʌndəˈmɛntəl/", "Forming a necessary base or core."),
-            Triple("Controversy", "/ˈkɒntrəvɜːsi/", "Prolonged public disagreement."),
-            Triple("Consequence", "/ˈkɒnsɪkwəns/", "A result of an action."),
-            Triple("Ambiguous", "/æmˈbɪɡjuəs/", "Open to more than one interpretation."),
-            Triple("Substantial", "/səbˈstænʃəl/", "Of considerable importance or size."),
-            Triple("Phenomenon", "/fɪˈnɒmɪnən/", "A fact or event that can be observed.")
-        )
-        acadWords.forEach { (word, pron, def) ->
-            addCardToDeck(acadDeck.id, Card(
-                englishWord = word, pronunciation = pron, pos = "Verb",
-                definition = def, exampleSentence = "It is important to $word this concept.",
-                synonyms = "", easeFactor = 2.5, interval = 1.0, repetitions = 0,
-                nextReview = now, lastReview = 0L, reviewState = ReviewState.New.name
-            ))
-        }
-
-        // === DECK 7: Idioms & Phrases ===
-        val idiomDeck = addDeck("Idioms & Phrases", "Languages", null)
-        val idiomWords = listOf(
-            Triple("Break the ice", "/breɪk ðə aɪs/", "To initiate conversation in a social setting."),
-            Triple("Hit the nail on the head", "", "To be exactly right about something."),
-            Triple("Bite off more than you can chew", "", "To take on more than you can handle."),
-            Triple("A piece of cake", "", "Something very easy to do."),
-            Triple("Let the cat out of the bag", "", "To reveal a secret accidentally."),
-            Triple("Burn the midnight oil", "", "To work late into the night."),
-            Triple("Kill two birds with one stone", "", "To accomplish two things with one action."),
-            Triple("Cost an arm and a leg", "", "To be very expensive."),
-            Triple("Under the weather", "", "Feeling ill or unwell."),
-            Triple("Once in a blue moon", "", "Very rarely.")
-        )
-        idiomWords.forEach { (word, pron, def) ->
-            addCardToDeck(idiomDeck.id, Card(
-                englishWord = word, pronunciation = pron, pos = "Phrase",
-                definition = def, exampleSentence = "\"$word\" is a common English idiom.",
-                synonyms = "", easeFactor = 2.5, interval = 1.0, repetitions = 0,
-                nextReview = now, lastReview = 0L, reviewState = ReviewState.New.name
-            ))
-        }
-
-        refreshWidget()
     }
 
-    // ==================== SYNC OPERATIONS ====================
-
     fun syncNow() {
-        val userId = currentUserId ?: return
-        val manager = syncManager ?: return
-
-        if (manager.isOnline()) {
+        val userId = currentUserId
+        if (userId != null && !useOfflineMode) {
             val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
             scope.launch {
-                // First sync from Firestore to local
-                manager.syncAllFromFirestore()
-                // Then sync local changes to Firestore
-                manager.syncAllToFirestore()
-                // Reload data
-                loadFromLocalDatabase(userId)
+                try {
+                    val dbInstance = appDatabase ?: return@launch
+
+                    // 1. Sync local profile updates to server
+                    val localProfile = userProfile.value
+                    ApiClient.put<UserProfile, UserProfile>("/users/$userId", localProfile)
+
+                    // 2. Fetch server decks
+                    val serverDecks = ApiClient.get<List<Deck>>("/users/$userId/decks") ?: emptyList()
+                    val serverDecksMap = serverDecks.associateBy { it.id }
+
+                    // 3. Process local soft-deleted decks
+                    val deletedDecks = dbInstance.deckDao().getSoftDeletedDecks()
+                    for (delDeck in deletedDecks) {
+                        ApiClient.delete("/users/$userId/decks/${delDeck.id}")
+                        dbInstance.deckDao().deleteDeck(delDeck)
+                    }
+
+                    // 4. Process local soft-deleted cards
+                    val deletedCards = dbInstance.cardDao().getSoftDeletedCards()
+                    for (delCard in deletedCards) {
+                        ApiClient.delete("/users/$userId/decks/${delCard.deckId}/cards/${delCard.id}")
+                        dbInstance.cardDao().deleteCard(delCard)
+                    }
+
+                    // 5. Get active Room decks & cards
+                    val localDecks = dbInstance.deckDao().getAllDecksSync()
+                    for (localDeck in localDecks) {
+                        val serverDeck = serverDecksMap[localDeck.id]
+                        if (serverDeck == null) {
+                            // Deck only exists locally (added while offline)
+                            val localCards = dbInstance.cardDao().getCardsByDeckIdSync(localDeck.id)
+                            val deckToSend = localDeck.toDeck().copy(cards = localCards.map { it.toCard() })
+                            ApiClient.post<Deck, Deck>("/users/$userId/decks", deckToSend)
+                        } else {
+                            // Deck exists on both: check if cards need syncing
+                            val localCards = dbInstance.cardDao().getCardsByDeckIdSync(localDeck.id)
+                            val serverCardsMap = serverDeck.cards.associateBy { it.id }
+
+                            for (localCard in localCards) {
+                                val serverCard = serverCardsMap[localCard.id]
+                                if (serverCard == null) {
+                                    // Card only exists locally
+                                    ApiClient.post<Card, Deck>("/users/$userId/decks/${localDeck.id}/cards", localCard.toCard())
+                                } else {
+                                    // Card exists on both: update if local is newer
+                                    if (localCard.lastModified > (serverCard.lastReview)) {
+                                        ApiClient.put<Card, Deck>("/users/$userId/decks/${localDeck.id}/cards/${localCard.id}", localCard.toCard())
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 6. Fetch fresh latest state and update Room cache
+                    val freshDecks = ApiClient.get<List<Deck>>("/users/$userId/decks")
+                    val freshProfile = ApiClient.get<UserProfile>("/users/$userId")
+
+                    if (freshDecks != null) {
+                        // Clear Room database decks & cards
+                        val oldDecks = dbInstance.deckDao().getAllDecksSync()
+                        for (od in oldDecks) {
+                            dbInstance.deckDao().deleteDeck(od)
+                            val oldCards = dbInstance.cardDao().getCardsByDeckIdSync(od.id)
+                            for (oc in oldCards) {
+                                dbInstance.cardDao().deleteCard(oc)
+                            }
+                        }
+
+                        // Write fresh server decks & cards to Room
+                        for (d in freshDecks) {
+                            dbInstance.deckDao().insertDeck(com.example.mindcard.data.local.entity.DeckEntity.fromDeck(d))
+                            for (c in d.cards) {
+                                dbInstance.cardDao().insertCard(com.example.mindcard.data.local.entity.CardEntity.fromCard(c, d.id))
+                            }
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            decks.clear()
+                            decks.addAll(freshDecks)
+                        }
+                    }
+
+                    if (freshProfile != null) {
+                        dbInstance.userProfileDao().insertUserProfile(com.example.mindcard.data.local.entity.UserProfileEntity.fromUserProfile(freshProfile, userId))
+                        withContext(Dispatchers.Main) {
+                            userProfile.value = freshProfile
+                        }
+                    }
+
+                    refreshWidget()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
     }
@@ -886,7 +930,7 @@ object Database {
         useOfflineMode = false
         val userId = currentUserId
         if (userId != null) {
-            setupFirestoreListeners(userId)
+            initializeUserPersistence(userId)
         }
     }
 }

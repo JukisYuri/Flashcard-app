@@ -27,6 +27,9 @@ interface CardDao {
     @Delete
     suspend fun deleteCard(card: CardEntity)
 
+    @Query("SELECT * FROM cards WHERE isDeleted = 1")
+    suspend fun getSoftDeletedCards(): List<CardEntity>
+
     @Query("UPDATE cards SET isDeleted = 1, lastModified = :timestamp WHERE id = :cardId")
     suspend fun softDeleteCard(cardId: String, timestamp: Long = System.currentTimeMillis())
 

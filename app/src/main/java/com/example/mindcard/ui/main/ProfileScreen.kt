@@ -3,8 +3,10 @@ package com.example.mindcard.ui.main
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -64,6 +66,7 @@ fun ProfileScreen(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
@@ -203,19 +206,141 @@ fun ProfileScreen(
             shape = RoundedCornerShape(24.dp),
             border = ButtonDefaults.outlinedButtonBorder(enabled = true)
         ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Achievements", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    BadgeCircle("🔥", "Streak Lord", profile.currentStreak >= 7)
-                    BadgeCircle("🧠", "Vocab Master", profile.totalWordsLearned >= 10)
-                    BadgeCircle("⚡", "XP Hunter", profile.totalXp >= 100)
-                    BadgeCircle("📚", "Bookworm", profile.totalWordsLearned >= 50)
-                    BadgeCircle("🎯", "Sharpshooter", profile.currentStreak >= 30)
-                    BadgeCircle("🔒", "Super Learner", profile.totalXp >= 500)
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("Badges & Achievements", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            BadgeItem(
+                                emoji = "🌱",
+                                title = "Day One",
+                                desc = "Account created",
+                                progress = 1f,
+                                progressText = "Unlocked",
+                                unlocked = true
+                            )
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
+                            val isStreakUnlocked = profile.currentStreak >= 3
+                            val streakProgress = (profile.currentStreak.toFloat() / 3f).coerceIn(0f, 1f)
+                            BadgeItem(
+                                emoji = "🔥",
+                                title = "Streak Lord",
+                                desc = "3-day study streak",
+                                progress = streakProgress,
+                                progressText = "${profile.currentStreak}/3d",
+                                unlocked = isStreakUnlocked
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            val wordGoal = 20
+                            val isVocabUnlocked = profile.totalWordsLearned >= wordGoal
+                            val vocabProgress = (profile.totalWordsLearned.toFloat() / wordGoal.toFloat()).coerceIn(0f, 1f)
+                            BadgeItem(
+                                emoji = "🧠",
+                                title = "Vocab Master",
+                                desc = "$wordGoal words learned",
+                                progress = vocabProgress,
+                                progressText = "${profile.totalWordsLearned}/$wordGoal",
+                                unlocked = isVocabUnlocked
+                            )
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
+                            val xpGoal = 100
+                            val isXpUnlocked = profile.totalXp >= xpGoal
+                            val xpProgress = (profile.totalXp.toFloat() / xpGoal.toFloat()).coerceIn(0f, 1f)
+                            BadgeItem(
+                                emoji = "⚡",
+                                title = "XP Champion",
+                                desc = "$xpGoal XP points",
+                                progress = xpProgress,
+                                progressText = "${profile.totalXp}/$xpGoal XP",
+                                unlocked = isXpUnlocked
+                            )
+                        }
+                    }
                 }
+            }
+        }
+
+        // Settings / Reminders
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White, RoundedCornerShape(24.dp))
+                .border(1.dp, OutlineVariantColor.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                .padding(16.dp)
+        ) {
+            Text("Settings", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            val context = androidx.compose.ui.platform.LocalContext.current
+            var reminderEnabled by remember {
+                mutableStateOf(com.example.mindcard.util.ReminderManager.isReminderEnabled(context))
+            }
+
+            // Android 13+ Notification Permission Launcher
+            val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+            ) { isGranted ->
+                if (isGranted) {
+                    com.example.mindcard.util.ReminderManager.scheduleDailyReminder(context)
+                    reminderEnabled = true
+                } else {
+                    reminderEnabled = false
+                    android.widget.Toast.makeText(
+                        context,
+                        "Notification permission denied. Cannot schedule reminder.",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Daily Study Reminder", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF191C1E))
+                    Text("Get notified daily at 20:00 to keep up your streak", fontSize = 11.sp, color = OutlineColor)
+                }
+                Switch(
+                    checked = reminderEnabled,
+                    onCheckedChange = { checked ->
+                        if (checked) {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                // Request permission on Android 13+
+                                permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                com.example.mindcard.util.ReminderManager.scheduleDailyReminder(context)
+                                reminderEnabled = true
+                            }
+                        } else {
+                            com.example.mindcard.util.ReminderManager.cancelDailyReminder(context)
+                            reminderEnabled = false
+                        }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = PrimaryIndigo,
+                        uncheckedThumbColor = OutlineColor,
+                        uncheckedTrackColor = Color(0xFFF2F4F6)
+                    )
+                )
             }
         }
 
@@ -274,19 +399,70 @@ fun ProfileStatItem(label: String, value: String) {
 }
 
 @Composable
-fun BadgeCircle(emoji: String, name: String, unlocked: Boolean) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+fun BadgeItem(
+    emoji: String,
+    title: String,
+    desc: String,
+    progress: Float,
+    progressText: String,
+    unlocked: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (unlocked) Color(0xFFF9FAFC) else Color(0xFFFAFAFA), RoundedCornerShape(14.dp))
+            .border(
+                1.dp,
+                if (unlocked) PrimaryIndigo.copy(alpha = 0.15f) else OutlineVariantColor.copy(alpha = 0.3f),
+                RoundedCornerShape(14.dp)
+            )
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
         Box(
             modifier = Modifier
-                .size(44.dp)
+                .size(36.dp)
                 .clip(CircleShape)
-                .background(if (unlocked) AccentYellow.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant)
-                .border(2.dp, if (unlocked) AccentYellow else Color.Transparent, CircleShape),
+                .background(if (unlocked) Color(0xFFFFE083).copy(alpha = 0.3f) else Color(0xFFEAEAEA)),
             contentAlignment = Alignment.Center
         ) {
-            Text(if (unlocked) emoji else "🔒", fontSize = 20.sp)
+            Text(if (unlocked) emoji else "🔒", fontSize = 18.sp)
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(name, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (unlocked) Color(0xFF191C1E) else OutlineColor
+            )
+            Text(
+                text = desc,
+                fontSize = 9.sp,
+                color = OutlineColor,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(3.dp)
+                        .clip(CircleShape),
+                    color = if (unlocked) SecondaryGreen else PrimaryIndigo,
+                    trackColor = Color(0xFFE2E8F0)
+                )
+                Text(
+                    text = progressText,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (unlocked) SecondaryGreen else OutlineColor
+                )
+            }
+        }
     }
 }

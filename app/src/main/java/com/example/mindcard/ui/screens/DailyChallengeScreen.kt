@@ -47,6 +47,14 @@ fun DailyChallengeScreen(
         targetValue = if (isFlipped) 180f else 0f
     )
 
+    LaunchedEffect(isCompleted) {
+        if (isCompleted) {
+            val accuracy = if (allCards.isNotEmpty()) (score * 100) / allCards.size else 0
+            val xp = score * 15
+            Database.recordStudySession("daily_challenge", accuracy, xp, 1)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(

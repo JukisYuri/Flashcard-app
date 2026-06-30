@@ -41,6 +41,10 @@ class HomeViewModel : ViewModel() {
         deckRepository.seedDemoData()
     }
 
+    fun deleteDeck(deckId: String) {
+        deckRepository.deleteDeck(deckId)
+    }
+
     fun openReviewGate() {
         val due = getTotalDueCards()
         if (!showReviewGate && due > 0) {

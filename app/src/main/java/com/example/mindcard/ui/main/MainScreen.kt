@@ -45,26 +45,12 @@ fun MainScreen(
     var activeTab by remember { mutableStateOf(ActiveTab.Home) }
     val profile by viewModel.userProfile
     var showSyncDialog by remember { mutableStateOf(false) }
-    val isOnline = remember { mutableStateOf(Database.isOnline()) }
+    val isOnline = remember { mutableStateOf<Boolean>(Database.isOnline()) }
 
     val dueCount = viewModel.getTotalDueCards()
 
-    LaunchedEffect(dueCount) {
-        if (dueCount > 0 && !viewModel.showReviewGate) {
-            viewModel.showReviewGate = true
-        }
-    }
-
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.openReviewGate()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
+
 
     Scaffold(
         topBar = {
@@ -322,7 +308,11 @@ fun MainScreen(
             },
             onFinish = { accuracy, xp, cardsReviewed ->
                 viewModel.onReviewGateFinished(accuracy, xp, cardsReviewed)
-                Database.markTodayAsActive()
+                if (cardsReviewed > 0) {
+                    Database.recordStudySession("quick_review", accuracy, xp, 1)
+                } else {
+                    Database.markTodayAsActive()
+                }
             }
         )
     }
