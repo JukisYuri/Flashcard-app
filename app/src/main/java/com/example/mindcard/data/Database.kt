@@ -1,5 +1,6 @@
 package com.example.mindcard.data
 
+import android.annotation.SuppressLint
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
@@ -89,6 +90,7 @@ data class UserProfile(
     val studyHistory: Map<String, Boolean> = emptyMap() // "YYYY-MM-DD" -> true
 )
 
+@SuppressLint("StaticFieldLeak")
 object Database {
     val decks = mutableStateListOf<Deck>()
     val userProfile = mutableStateOf(UserProfile())
