@@ -3,13 +3,17 @@ package com.example.mindcard.data
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import kotlinx.serialization.Serializable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
+@Serializable
 data class Card(
     val id: String = UUID.randomUUID().toString(),
     val englishWord: String = "",
@@ -20,6 +24,7 @@ data class Card(
     val synonyms: String = ""
 )
 
+@Serializable
 data class Deck(
     val id: String = UUID.randomUUID().toString(),
     val name: String = "",
@@ -29,6 +34,7 @@ data class Deck(
     val masteredPercentage: Int = 0
 )
 
+@Serializable
 data class UserProfile(
     val name: String = "Guest Learner",
     val title: String = "Language Explorer",
@@ -49,9 +55,6 @@ object Database {
     var currentSessionXp = 0
     var currentSessionTime = 0
 
-    private val db by lazy { FirebaseFirestore.getInstance() }
-    private var profileListener: ListenerRegistration? = null
-    private var decksListener: ListenerRegistration? = null
     private var currentUserId: String? = null
 
     init {
@@ -61,52 +64,31 @@ object Database {
     fun initializeUserPersistence(userId: String) {
         if (currentUserId == userId) return // Already initialized for this user
 
-        // Clean up previous listeners
-        profileListener?.remove()
-        decksListener?.remove()
-
         currentUserId = userId
 
-        // Listen to profile
-        val profileRef = db.collection("users").document(userId)
-        profileListener = profileRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                return@addSnapshotListener
-            }
-            if (snapshot != null && snapshot.exists()) {
-                val profile = snapshot.toObject(UserProfile::class.java)
+        // Fetch profile and decks from Spring Boot backend asynchronously
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val profile = ApiClient.get<UserProfile>("/users/$userId")
                 if (profile != null) {
-                    userProfile.value = profile
+                    withContext(Dispatchers.Main) {
+                        userProfile.value = profile
+                    }
                 }
-            } else {
-                // If profile doesn't exist, create it
-                val displayName = FirebaseAuth.getInstance().currentUser?.displayName ?: "Learner"
-                val initialProfile = UserProfile(name = displayName)
-                profileRef.set(initialProfile)
-            }
-        }
-
-        // Listen to decks
-        val decksRef = db.collection("users").document(userId).collection("decks")
-        decksListener = decksRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                return@addSnapshotListener
-            }
-            if (snapshot != null) {
-                val fetchedDecks = snapshot.documents.mapNotNull { doc ->
-                    doc.toObject(Deck::class.java)?.copy(id = doc.id)
+                val fetchedDecks = ApiClient.get<List<Deck>>("/users/$userId/decks")
+                if (fetchedDecks != null) {
+                    withContext(Dispatchers.Main) {
+                        decks.clear()
+                        decks.addAll(fetchedDecks)
+                    }
                 }
-                decks.clear()
-                decks.addAll(fetchedDecks)
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
 
     fun clearPersistence() {
-        profileListener?.remove()
-        decksListener?.remove()
-        profileListener = null
-        decksListener = null
         currentUserId = null
         decks.clear()
         userProfile.value = UserProfile()
@@ -116,7 +98,10 @@ object Database {
         val newDeck = Deck(name = name, category = category, coverUrl = coverUrl)
         val userId = currentUserId
         if (userId != null) {
-            db.collection("users").document(userId).collection("decks").document(newDeck.id).set(newDeck)
+            decks.add(newDeck)
+            CoroutineScope(Dispatchers.IO).launch {
+                ApiClient.post<Deck, Deck>("/users/$userId/decks", newDeck)
+            }
         } else {
             decks.add(newDeck)
         }
@@ -133,7 +118,10 @@ object Database {
         )
         val userId = currentUserId
         if (userId != null) {
-            db.collection("users").document(userId).collection("decks").document(newDeck.id).set(newDeck)
+            decks.add(newDeck)
+            CoroutineScope(Dispatchers.IO).launch {
+                ApiClient.post<Deck, Deck>("/users/$userId/decks", newDeck)
+            }
         } else {
             decks.add(newDeck)
         }
@@ -145,11 +133,12 @@ object Database {
         if (index != -1) {
             val deck = decks[index]
             val updatedDeck = deck.copy(name = name, category = category)
+            decks[index] = updatedDeck
             val userId = currentUserId
             if (userId != null) {
-                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
-            } else {
-                decks[index] = updatedDeck
+                CoroutineScope(Dispatchers.IO).launch {
+                    ApiClient.put<Deck, Deck>("/users/$userId/decks/$deckId", updatedDeck)
+                }
             }
         }
     }
@@ -163,11 +152,12 @@ object Database {
                 cards = updatedCards,
                 masteredPercentage = calculateMastered(updatedCards)
             )
+            decks[index] = updatedDeck
             val userId = currentUserId
             if (userId != null) {
-                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
-            } else {
-                decks[index] = updatedDeck
+                CoroutineScope(Dispatchers.IO).launch {
+                    ApiClient.post<Card, Deck>("/users/$userId/decks/$deckId/cards", card)
+                }
             }
         }
     }
@@ -181,11 +171,12 @@ object Database {
                 cards = updatedCards,
                 masteredPercentage = calculateMastered(updatedCards)
             )
+            decks[index] = updatedDeck
             val userId = currentUserId
             if (userId != null) {
-                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
-            } else {
-                decks[index] = updatedDeck
+                CoroutineScope(Dispatchers.IO).launch {
+                    ApiClient.delete("/users/$userId/decks/$deckId/cards/$cardId")
+                }
             }
         }
     }
@@ -194,18 +185,25 @@ object Database {
         val index = decks.indexOfFirst { it.id == deckId }
         if (index != -1) {
             val deck = decks[index]
+            var cardToUpdate: Card? = null
             val updatedCards = deck.cards.map { card ->
-                if (card.id == cardId) card.copy(englishWord = newFront, definition = newBack) else card
+                if (card.id == cardId) {
+                    val c = card.copy(englishWord = newFront, definition = newBack)
+                    cardToUpdate = c
+                    c
+                } else card
             }
             val updatedDeck = deck.copy(
                 cards = updatedCards,
                 masteredPercentage = calculateMastered(updatedCards)
             )
+            decks[index] = updatedDeck
             val userId = currentUserId
-            if (userId != null) {
-                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
-            } else {
-                decks[index] = updatedDeck
+            val cardObj = cardToUpdate
+            if (userId != null && cardObj != null) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    ApiClient.put<Card, Deck>("/users/$userId/decks/$deckId/cards/$cardId", cardObj)
+                }
             }
         }
     }
@@ -223,9 +221,10 @@ object Database {
         val index = decks.indexOfFirst { it.id == deckId }
         if (index != -1) {
             val deck = decks[index]
+            var cardToUpdate: Card? = null
             val updatedCards = deck.cards.map { card ->
                 if (card.id == cardId) {
-                    card.copy(
+                    val c = card.copy(
                         englishWord = englishWord,
                         pronunciation = pronunciation,
                         pos = pos,
@@ -233,36 +232,45 @@ object Database {
                         exampleSentence = exampleSentence,
                         synonyms = synonyms
                     )
+                    cardToUpdate = c
+                    c
                 } else card
             }
             val updatedDeck = deck.copy(
                 cards = updatedCards,
                 masteredPercentage = calculateMastered(updatedCards)
             )
+            decks[index] = updatedDeck
             val userId = currentUserId
-            if (userId != null) {
-                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
-            } else {
-                decks[index] = updatedDeck
+            val cardObj = cardToUpdate
+            if (userId != null && cardObj != null) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    ApiClient.put<Card, Deck>("/users/$userId/decks/$deckId/cards/$cardId", cardObj)
+                }
             }
         }
     }
 
     fun deleteDeck(deckId: String) {
+        val index = decks.indexOfFirst { it.id == deckId }
+        if (index != -1) {
+            decks.removeAt(index)
+        }
         val userId = currentUserId
         if (userId != null) {
-            db.collection("users").document(userId).collection("decks").document(deckId).delete()
-        } else {
-            decks.removeAll { it.id == deckId }
+            CoroutineScope(Dispatchers.IO).launch {
+                ApiClient.delete("/users/$userId/decks/$deckId")
+            }
         }
     }
 
     fun updateUserProfile(profile: UserProfile) {
+        userProfile.value = profile
         val userId = currentUserId
         if (userId != null) {
-            db.collection("users").document(userId).set(profile)
-        } else {
-            userProfile.value = profile
+            CoroutineScope(Dispatchers.IO).launch {
+                ApiClient.put<UserProfile, UserProfile>("/users/$userId", profile)
+            }
         }
     }
 
@@ -275,21 +283,18 @@ object Database {
         currentSessionXp = xp
         currentSessionTime = timeMin
 
-        // Update profile
+        // Optimistic UI updates
         val profile = userProfile.value
         val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val updatedHistory = profile.studyHistory.toMutableMap()
         updatedHistory[todayStr] = true
 
-        // Calculate new streak
         var newStreak = profile.currentStreak
         if (profile.studyHistory[todayStr] != true) {
             newStreak += 1
         }
         if (newStreak == 0) newStreak = 1
         val bestStreak = maxOf(profile.bestStreak, newStreak)
-
-        // Count unique words in all decks
         val uniqueWords = decks.flatMap { it.cards }.map { it.englishWord.lowercase() }.distinct().size
 
         val updatedProfile = profile.copy(
@@ -299,20 +304,30 @@ object Database {
             totalWordsLearned = uniqueWords,
             studyHistory = updatedHistory
         )
+        userProfile.value = updatedProfile
 
-        updateUserProfile(updatedProfile)
-
-        // Update deck mastery progress slightly
         val deckIndex = decks.indexOfFirst { it.id == deckId }
         if (deckIndex != -1) {
             val deck = decks[deckIndex]
             val newMastery = minOf(100, deck.masteredPercentage + (accuracy / 10))
-            val updatedDeck = deck.copy(masteredPercentage = newMastery)
-            val userId = currentUserId
-            if (userId != null) {
-                db.collection("users").document(userId).collection("decks").document(deckId).set(updatedDeck)
-            } else {
-                decks[deckIndex] = updatedDeck
+            decks[deckIndex] = deck.copy(masteredPercentage = newMastery)
+        }
+
+        // Asynchronous server sync
+        val userId = currentUserId
+        if (userId != null) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val req = StudySessionRequest(deckId, accuracy, xp, timeMin)
+                    val respProfile = ApiClient.post<StudySessionRequest, UserProfile>("/users/$userId/decks/study-session", req)
+                    if (respProfile != null) {
+                        withContext(Dispatchers.Main) {
+                            userProfile.value = respProfile
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
     }
@@ -324,40 +339,72 @@ object Database {
     fun seedDemoData() {
         val userId = currentUserId
         if (userId != null) {
-            // Delete all current decks in Firestore first to reset
-            decks.forEach { deck ->
-                db.collection("users").document(userId).collection("decks").document(deck.id).delete()
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    // Clear existing decks on server
+                    val existingDecks = ApiClient.get<List<Deck>>("/users/$userId/decks") ?: emptyList()
+                    for (deck in existingDecks) {
+                        ApiClient.delete("/users/$userId/decks/${deck.id}")
+                    }
+
+                    // Add Basic Greetings
+                    val basicDeck = Deck(
+                        id = UUID.randomUUID().toString(),
+                        name = "Basic Greetings",
+                        category = "Languages",
+                        masteredPercentage = 10,
+                        cards = listOf(
+                            Card(
+                                englishWord = "Hello",
+                                pronunciation = "/həˈloʊ/",
+                                pos = "Noun",
+                                definition = "Used as a greeting or to begin a telephone conversation.",
+                                exampleSentence = "Hello, is anyone there?",
+                                synonyms = "Hi, Greetings"
+                            ),
+                            Card(
+                                englishWord = "Serendipity",
+                                pronunciation = "/ˌser.ənˈdɪp.ə.ti/",
+                                pos = "Noun",
+                                definition = "The occurrence and development of events by chance in a happy or beneficial way.",
+                                exampleSentence = "A fortunate stroke of serendipity.",
+                                synonyms = "Coincidence, Luck"
+                            )
+                        )
+                    )
+                    ApiClient.post<Deck, Deck>("/users/$userId/decks", basicDeck)
+
+                    // Add Food & Dining
+                    val foodDeck = Deck(
+                        id = UUID.randomUUID().toString(),
+                        name = "Food & Dining",
+                        category = "Languages",
+                        masteredPercentage = 10,
+                        cards = listOf(
+                            Card(
+                                englishWord = "Delicious",
+                                pronunciation = "/dɪˈlɪʃəs/",
+                                pos = "Adj",
+                                definition = "Highly pleasant to the taste.",
+                                exampleSentence = "The food was delicious.",
+                                synonyms = "Tasty, Yummy"
+                            )
+                        )
+                    )
+                    ApiClient.post<Deck, Deck>("/users/$userId/decks", foodDeck)
+
+                    // Refetch to align client state
+                    val freshDecks = ApiClient.get<List<Deck>>("/users/$userId/decks")
+                    if (freshDecks != null) {
+                        withContext(Dispatchers.Main) {
+                            decks.clear()
+                            decks.addAll(freshDecks)
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
-        } else {
-            decks.clear()
         }
-
-        val basicSet = addDeck("Basic Greetings", "Languages", null)
-        addCardToDeck(basicSet.id, Card(
-            englishWord = "Hello",
-            pronunciation = "/həˈloʊ/",
-            pos = "Noun",
-            definition = "Used as a greeting or to begin a telephone conversation.",
-            exampleSentence = "Hello, is anyone there?",
-            synonyms = "Hi, Greetings"
-        ))
-        addCardToDeck(basicSet.id, Card(
-            englishWord = "Serendipity",
-            pronunciation = "/ˌser.ənˈdɪp.ə.ti/",
-            pos = "Noun",
-            definition = "The occurrence and development of events by chance in a happy or beneficial way.",
-            exampleSentence = "A fortunate stroke of serendipity.",
-            synonyms = "Coincidence, Luck"
-        ))
-
-        val foodSet = addDeck("Food & Dining", "Languages", null)
-        addCardToDeck(foodSet.id, Card(
-            englishWord = "Delicious",
-            pronunciation = "/dɪˈlɪʃəs/",
-            pos = "Adj",
-            definition = "Highly pleasant to the taste.",
-            exampleSentence = "The food was delicious.",
-            synonyms = "Tasty, Yummy"
-        ))
     }
 }
